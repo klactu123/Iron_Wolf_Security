@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+/* Smooth scrolling for TOC links */
+html {
+  scroll-behavior: smooth;
+}
+
+@media print {
+  /* Force color printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  body,
+  #root,
+  .bg-zinc-950 {
+    background: white !important;
+    color: black !important;
+  }
+
+  .print\:hidden,
+  header,
+  footer,
+  button:not(.print-keep) {
+    display: none !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  /* Document container */
+  .policy-document {
+    max-width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .policy-document .bg-zinc-900,
+  .policy-document [class*="bg-zinc-9"] {
+    background: white !important;
+    border-color: #ddd !important;
+  }
+
+  /* Document header — keep gradient color */
+  .policy-document [class*="from-blue-950"] {
+    background: linear-gradient(to bottom right, #eff6ff, #f8fafc) !important;
+    border: 2px solid #3b82f6 !important;
+  }
+  .policy-document [class*="from-purple-950"] {
+    background: linear-gradient(to bottom right, #f5f3ff, #f8fafc) !important;
+    border: 2px solid #a855f7 !important;
+  }
+
+  /* Accent bar at top of header */
+  .policy-document .bg-blue-500 {
+    background: #3b82f6 !important;
+  }
+  .policy-document .bg-purple-500 {
+    background: #a855f7 !important;
+  }
+
+  /* Table of contents */
+  .print-toc {
+    background: #fafafa !important;
+    border: 1px solid #ddd !important;
+    page-break-after: always;
+  }
+
+  .print-toc nav a {
+    text-decoration: none !important;
+  }
+
+  /* Keep section heading border colors */
+  .policy-document .border-blue-500 { border-color: #3b82f6 !important; }
+  .policy-document .border-cyan-500 { border-color: #06b6d4 !important; }
+  .policy-document .border-green-500 { border-color: #22c55e !important; }
+  .policy-document .border-indigo-500 { border-color: #6366f1 !important; }
+  .policy-document .border-purple-500 { border-color: #a855f7 !important; }
+  .policy-document .border-red-500 { border-color: #ef4444 !important; }
+  .policy-document .border-orange-500 { border-color: #f97316 !important; }
+  .policy-document .border-yellow-500 { border-color: #eab308 !important; }
+  .policy-document .border-zinc-500 { border-color: #71717a !important; }
+
+  /* Keep icon accent colors */
+  .policy-document .text-blue-400 { color: #3b82f6 !important; }
+  .policy-document .text-cyan-400 { color: #06b6d4 !important; }
+  .policy-document .text-green-400 { color: #22c55e !important; }
+  .policy-document .text-indigo-400 { color: #6366f1 !important; }
+  .policy-document .text-purple-400 { color: #a855f7 !important; }
+  .policy-document .text-red-400 { color: #ef4444 !important; }
+  .policy-document .text-orange-400 { color: #f97316 !important; }
+  .policy-document .text-yellow-400 { color: #eab308 !important; }
+
+  /* Text colors — dark for readability on white */
+  .text-zinc-100, .text-zinc-200, .text-white {
+    color: #111 !important;
+  }
+  .text-zinc-300 {
+    color: #1a1a1a !important;
+  }
+  .text-zinc-400, .text-zinc-500, .text-zinc-600 {
+    color: #555 !important;
+  }
+
+  /* Tables */
+  .policy-document table {
+    border-collapse: collapse !important;
+  }
+  .policy-document th {
+    background: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #111 !important;
+  }
+  .policy-document td {
+    border: 1px solid #e2e8f0 !important;
+    color: #333 !important;
+  }
+
+  /* Section breaks */
+  .print-section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Links show URL and keep blue color */
+  .policy-document a[href] {
+    color: #2563eb !important;
+  }
+  .policy-document a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.7em;
+    color: #6b7280;
+  }
+
+  /* Code blocks */
+  .policy-document code {
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+  }
+}

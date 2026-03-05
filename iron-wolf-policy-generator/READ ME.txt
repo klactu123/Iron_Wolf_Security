@@ -1,0 +1,90 @@
+Iron Wolf Security Policy Generator & Reviewer
+===============================================
+Part of the Iron Wolf AI Security Toolkit
+Iron Wolf Interactive
+
+OVERVIEW
+--------
+Generate professional, framework-aligned security policy documents or review
+existing policies for compliance gaps. Powered by Claude AI with web search
+for real-time framework verification.
+
+Two modes:
+  - Generate: Select a framework and policy type to produce a complete policy
+  - Review: Paste an existing policy to get a gap analysis against a framework
+
+Supported Frameworks:
+  - NIST SP 800-53 Rev. 5
+  - CIS Controls v8
+  - ISO/IEC 27001:2022
+  - CMMC 2.0
+
+12 Policy Types:
+  Acceptable Use, Incident Response, Access Control, Data Classification,
+  Password & Authentication, Remote Work, Encryption, Vendor Management,
+  Change Management, Backup & Recovery, Network Security, Mobile Device
+
+REQUIREMENTS
+------------
+  - Node.js 18 or later
+  - Anthropic API key (Claude)
+
+QUICK START
+-----------
+  1. Double-click "Start Policy Generator.bat"
+     (This installs dependencies automatically on first run)
+
+  2. If prompted, add your Anthropic API key:
+     - Click the "Claude" settings button in the top-right corner
+     - Paste your API key (starts with sk-ant-)
+     - Or copy .env.example to .env and add: ANTHROPIC_API_KEY=sk-ant-...
+
+  3. The app opens at http://localhost:5175
+
+  4. Choose Generate or Review mode:
+     - Generate: Pick a framework + policy type, optionally add org context
+     - Review: Pick a framework, paste your existing policy text
+
+  5. Click Generate Policy or Review Policy
+
+  6. Use Copy or Print buttons to export the result
+
+MANUAL START
+------------
+  npm install
+  npm run dev
+
+  Frontend: http://localhost:5175
+  Backend:  http://localhost:3003
+
+PORT CONFLICTS
+--------------
+  The launcher automatically frees ports 5175 and 3003 on startup.
+  If you still have issues, run "cleanup-ports.bat" manually.
+
+SHUTDOWN
+--------
+  Click the green "Shutdown" button in the bottom-right corner of the app,
+  or press Ctrl+C in the terminal.
+
+SECURITY NOTES
+--------------
+  - The server binds to localhost only (127.0.0.1) and is not accessible
+    from other machines on your network.
+  - Your API key is stored server-side in the .env file and is never sent
+    to the browser.
+  - All inputs are validated and rate-limited.
+  - The .env file is excluded from version control via .gitignore.
+
+FILES
+-----
+  Start Policy Generator.bat  - One-click launcher
+  cleanup-ports.bat            - Kill processes on ports 5175/3003
+  .env.example                 - Template for environment variables
+  server/index.js              - Express API server
+  server/providers.js          - Claude API integration
+  src/prompts/system.js        - AI prompt templates (core IP)
+  src/App.jsx                  - Main React application
+  src/components/              - UI components
+  src/hooks/                   - React hooks
+  src/utils/                   - API utilities

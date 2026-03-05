@@ -8,31 +8,34 @@ import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 import path from "path";
 import fs from "fs";
-import { analyze, stream, hasApiKey, resetClient, MODEL } from "./providers.js";
-import { preprocessEmail } from "./preprocessor.js";
+import { stream, hasApiKey, resetClient } from "./providers.js";
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 3003;
 
 // SECURITY: Do NOT enable trust proxy — it would allow X-Forwarded-For spoofing
-// which would bypass the isLocalhost check for sensitive endpoints.
 app.set("trust proxy", false);
 
 // ---------------------------------------------------------------------------
 // Security middleware
 // ---------------------------------------------------------------------------
-const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:5174,http://localhost:3002")
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:5175,http://localhost:3003")
   .split(",")
   .map((o) => o.trim())
   .filter((o) => {
     if (o === "*") {
-      console.warn("SECURITY WARNING: Wildcard CORS origin '*' rejected. Use specific origins.");
+      console.warn("SECURITY WARNING: Wildcard CORS origin '*' rejected.");
       return false;
     }
-    try { new URL(o); return true; } catch { return false; }
+    try {
+      const parsed = new URL(o);
+      if (!["http:", "https:"].includes(parsed.protocol)) return false;
+      if (parsed.username || parsed.password) return false;
+      return true;
+    } catch { return false; }
   });
 
 app.use(cors({ origin: ALLOWED_ORIGINS }));
@@ -51,10 +54,12 @@ app.use(
         frameAncestors: ["'none'"],
       },
     },
+    referrerPolicy: { policy: "no-referrer" },
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-origin" },
   })
 );
 
-// Global rate limit: 120 requests per minute
 app.use(
   rateLimit({
     windowMs: 60_000,
@@ -65,11 +70,10 @@ app.use(
   })
 );
 
-// Stricter limits for expensive endpoints
 const analyzeLimiter = rateLimit({
   windowMs: 60_000,
-  max: 20,
-  message: { error: "Analysis rate limit reached. Please wait before trying again." },
+  max: 15,
+  message: { error: "Generation rate limit reached. Please wait before trying again." },
 });
 
 app.use(express.json({ limit: "1mb" }));
@@ -80,37 +84,65 @@ app.use(express.json({ limit: "1mb" }));
 function getClaudeErrorMessage(error) {
   const msg = error?.error?.error?.message || error?.message || "";
   if (msg.includes("credit balance is too low")) {
-    return "Anthropic API credit balance is too low. Please add credits at console.anthropic.com/settings/billing.";
+    return "API credit balance is too low. Please check your billing settings.";
   }
   if (msg.includes("invalid x-api-key") || msg.includes("invalid api key")) {
-    return "Anthropic API key is invalid. Please check your key in Settings.";
+    return "API key is invalid. Please check your key in Settings.";
   }
   if (error.status === 429) {
-    return "Claude API rate limit reached after multiple retries. Please wait 60 seconds before trying again.";
+    return "Rate limit reached. Please wait 60 seconds before trying again.";
   }
   if (error.status === 401) {
-    return "Anthropic API authentication failed. Please check your API key in Settings.";
+    return "API authentication failed. Please check your API key in Settings.";
   }
-  return "Analysis service temporarily unavailable. Please try again.";
+  return "Service temporarily unavailable. Please try again.";
 }
 
 // ---------------------------------------------------------------------------
 // Input validation
 // ---------------------------------------------------------------------------
-const MAX_EMAIL_LENGTH = 500_000; // 500KB max email size
+const VALID_FRAMEWORKS = ["nist-800-53", "cis-v8", "iso-27001", "cmmc"];
+const VALID_POLICY_TYPES = [
+  "acceptable-use", "incident-response", "access-control", "data-classification",
+  "password", "remote-work", "encryption", "vendor-management",
+  "change-management", "backup-recovery", "network-security", "mobile-device",
+];
+const MAX_POLICY_LENGTH = 200_000; // 200KB for review mode
+const MAX_CONTEXT_LENGTH = 5_000;  // 5KB for org context
 
-function validateEmailInput(req, res) {
-  const { email } = req.body;
-  if (!email || typeof email !== "string") {
-    res.status(400).json({ error: "Missing or invalid email content." });
+function validateGenerateInput(req, res) {
+  const { framework, policyType, orgContext } = req.body;
+  if (!framework || !VALID_FRAMEWORKS.includes(framework)) {
+    res.status(400).json({ error: "Invalid framework. Choose from: " + VALID_FRAMEWORKS.join(", ") });
     return false;
   }
-  if (email.trim().length < 10) {
-    res.status(400).json({ error: "Email content too short to analyze. Please paste the full email." });
+  if (!policyType || !VALID_POLICY_TYPES.includes(policyType)) {
+    res.status(400).json({ error: "Invalid policy type." });
     return false;
   }
-  if (email.length > MAX_EMAIL_LENGTH) {
-    res.status(400).json({ error: "Email content exceeds maximum size (500KB)." });
+  if (orgContext && (typeof orgContext !== "string" || orgContext.length > MAX_CONTEXT_LENGTH)) {
+    res.status(400).json({ error: "Organization context exceeds maximum size (5KB)." });
+    return false;
+  }
+  return true;
+}
+
+function validateReviewInput(req, res) {
+  const { framework, policy } = req.body;
+  if (!framework || !VALID_FRAMEWORKS.includes(framework)) {
+    res.status(400).json({ error: "Invalid framework. Choose from: " + VALID_FRAMEWORKS.join(", ") });
+    return false;
+  }
+  if (!policy || typeof policy !== "string") {
+    res.status(400).json({ error: "Missing policy content." });
+    return false;
+  }
+  if (policy.trim().length < 50) {
+    res.status(400).json({ error: "Policy content too short. Please paste the full policy." });
+    return false;
+  }
+  if (policy.length > MAX_POLICY_LENGTH) {
+    res.status(400).json({ error: "Policy content exceeds maximum size (200KB)." });
     return false;
   }
   return true;
@@ -126,77 +158,97 @@ const healthLimiter = rateLimit({
 });
 
 app.get("/api/health", healthLimiter, (req, res) => {
-  res.json({
-    status: "ok",
-    tool: "phishing-analyzer",
-    hasClaudeKey: hasApiKey(),
-  });
-});
-
-// ---------------------------------------------------------------------------
-// POST /api/analyze — Non-streaming phishing analysis
-// ---------------------------------------------------------------------------
-app.post("/api/analyze", analyzeLimiter, async (req, res) => {
-  if (!validateEmailInput(req, res)) return;
-
-  const { email } = req.body;
-  const trimmedEmail = preprocessEmail(email);
-
-  try {
-    const { getSystemPrompt } = await import("../src/prompts/system.js");
-    const systemPrompt = getSystemPrompt();
-
-    const result = await analyze(trimmedEmail, systemPrompt);
-    res.json(result);
-  } catch (error) {
-    console.error("Claude API error:", error.message?.substring(0, 500));
-    const userMessage = getClaudeErrorMessage(error);
-    res.status(error.status >= 400 && error.status < 600 ? error.status : 500).json({ error: userMessage });
+  const body = { status: "ok", tool: "policy-generator" };
+  if (isLocalhost(req)) {
+    body.hasClaudeKey = hasApiKey();
   }
+  res.json(body);
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/analyze/stream — Streaming phishing analysis via SSE
+// POST /api/generate/stream — Generate a policy via SSE
 // ---------------------------------------------------------------------------
-const STREAM_TIMEOUT_MS = 180_000; // 3 minutes max
+const STREAM_TIMEOUT_MS = 180_000;
 
-app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
-  if (!validateEmailInput(req, res)) return;
+app.post("/api/generate/stream", analyzeLimiter, async (req, res) => {
+  if (!validateGenerateInput(req, res)) return;
 
-  const { email } = req.body;
-  const trimmedEmail = preprocessEmail(email);
+  const { framework, policyType, orgContext } = req.body;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("X-Content-Type-Options", "nosniff");
 
-  // SSE timeout — prevent connections from hanging indefinitely
   const streamTimeout = setTimeout(() => {
     if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ type: "error", error: "Analysis timed out. Please try again." })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "error", error: "Generation timed out. Please try again." })}\n\n`);
       res.end();
     }
   }, STREAM_TIMEOUT_MS);
 
   try {
-    const { getSystemPrompt } = await import("../src/prompts/system.js");
-    const systemPrompt = getSystemPrompt();
+    const { getGeneratePrompt, POLICY_TYPES } = await import("../src/prompts/system.js");
+    const systemPrompt = getGeneratePrompt(framework, policyType, orgContext);
+    const policyDesc = POLICY_TYPES[policyType] || policyType;
+    const userMessage = `Generate a complete ${policyDesc} aligned to the ${framework} framework. Include all required sections with specific, auditable policy statements and framework control references.`;
 
     let aborted = false;
     req.on("close", () => { aborted = true; clearTimeout(streamTimeout); });
 
-    await stream(trimmedEmail, systemPrompt, res);
+    await stream(userMessage, systemPrompt, res);
     clearTimeout(streamTimeout);
     if (!aborted) res.end();
   } catch (error) {
     clearTimeout(streamTimeout);
-    console.error("Claude API streaming error:", error.message?.substring(0, 500));
+    console.error("Claude API error:", (error.message || "unknown").substring(0, 200).replace(/sk-ant-[a-zA-Z0-9_-]+/g, "[REDACTED]"));
     if (!res.writableEnded) {
       const userMessage = getClaudeErrorMessage(error);
-      res.write(
-        `data: ${JSON.stringify({ type: "error", error: userMessage })}\n\n`
-      );
+      res.write(`data: ${JSON.stringify({ type: "error", error: userMessage })}\n\n`);
+      res.end();
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/review/stream — Review a policy via SSE
+// ---------------------------------------------------------------------------
+app.post("/api/review/stream", analyzeLimiter, async (req, res) => {
+  if (!validateReviewInput(req, res)) return;
+
+  const { framework, policy } = req.body;
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+
+  const streamTimeout = setTimeout(() => {
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ type: "error", error: "Review timed out. Please try again." })}\n\n`);
+      res.end();
+    }
+  }, STREAM_TIMEOUT_MS);
+
+  try {
+    const { getReviewPrompt } = await import("../src/prompts/system.js");
+    const systemPrompt = getReviewPrompt(framework);
+    const userMessage = `Review the following security policy for compliance against the ${framework} framework. Identify all gaps, weaknesses, and areas for improvement.\n\n<policy>\n${policy}\n</policy>`;
+
+    let aborted = false;
+    req.on("close", () => { aborted = true; clearTimeout(streamTimeout); });
+
+    await stream(userMessage, systemPrompt, res);
+    clearTimeout(streamTimeout);
+    if (!aborted) res.end();
+  } catch (error) {
+    clearTimeout(streamTimeout);
+    console.error("Claude API error:", (error.message || "unknown").substring(0, 200).replace(/sk-ant-[a-zA-Z0-9_-]+/g, "[REDACTED]"));
+    if (!res.writableEnded) {
+      const userMessage = getClaudeErrorMessage(error);
+      res.write(`data: ${JSON.stringify({ type: "error", error: userMessage })}\n\n`);
       res.end();
     }
   }
@@ -206,34 +258,30 @@ app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
 // Localhost check
 // ---------------------------------------------------------------------------
 function isLocalhost(req) {
-  const ip = req.ip || req.connection?.remoteAddress || "";
-  return ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost"].includes(ip);
+  const remoteAddress = req.socket?.remoteAddress || "";
+  return ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(remoteAddress);
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/settings/api-key — Set Anthropic API key (localhost only)
+// Settings — API key management (localhost only)
 // ---------------------------------------------------------------------------
 const settingsLimiter = rateLimit({
   windowMs: 60_000,
   max: 5,
-  message: { error: "Settings rate limit reached. Please wait before trying again." },
+  message: { error: "Settings rate limit reached." },
 });
 
 app.post("/api/settings/api-key", settingsLimiter, (req, res) => {
   if (!isLocalhost(req)) {
     return res.status(403).json({ error: "This endpoint is only available from localhost." });
   }
-
   const { key } = req.body || {};
   if (!key || typeof key !== "string") {
     return res.status(400).json({ error: "Missing API key." });
   }
-
-  if (!key.startsWith("sk-ant-") || key.length < 40 || key.length > 200) {
-    return res.status(400).json({ error: "Invalid API key format. Key must start with 'sk-ant-' and be 40-200 characters." });
+  if (!key.startsWith("sk-ant-") || key.length < 40 || key.length > 120) {
+    return res.status(400).json({ error: "Invalid API key format." });
   }
-
-  // Reject control characters and newlines to prevent .env injection
   if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
     return res.status(400).json({ error: "API key contains invalid characters." });
   }
@@ -241,21 +289,17 @@ app.post("/api/settings/api-key", settingsLimiter, (req, res) => {
   try {
     const envPath = path.join(__dirname, "..", ".env");
     let envContent = "";
-
     if (fs.existsSync(envPath)) {
       envContent = fs.readFileSync(envPath, "utf-8");
     }
-
     if (/^ANTHROPIC_API_KEY=.*/m.test(envContent)) {
       envContent = envContent.replace(/^ANTHROPIC_API_KEY=.*/m, `ANTHROPIC_API_KEY=${key}`);
     } else {
       envContent = envContent.trimEnd() + (envContent.length ? "\n" : "") + `ANTHROPIC_API_KEY=${key}\n`;
     }
-
     fs.writeFileSync(envPath, envContent, "utf-8");
     process.env.ANTHROPIC_API_KEY = key;
     resetClient();
-
     console.log("Anthropic API key updated via settings.");
     res.json({ success: true });
   } catch (err) {
@@ -264,29 +308,23 @@ app.post("/api/settings/api-key", settingsLimiter, (req, res) => {
   }
 });
 
-// DELETE /api/settings/api-key
 app.delete("/api/settings/api-key", settingsLimiter, (req, res) => {
   if (!isLocalhost(req)) {
     return res.status(403).json({ error: "This endpoint is only available from localhost." });
   }
-
   const { confirm } = req.body || {};
   if (confirm !== true) {
     return res.status(400).json({ error: "Missing confirmation." });
   }
-
   try {
     const envPath = path.join(__dirname, "..", ".env");
-
     if (fs.existsSync(envPath)) {
       let envContent = fs.readFileSync(envPath, "utf-8");
       envContent = envContent.replace(/^ANTHROPIC_API_KEY=.*\n?/m, "");
       fs.writeFileSync(envPath, envContent, "utf-8");
     }
-
     delete process.env.ANTHROPIC_API_KEY;
     resetClient();
-
     console.log("Anthropic API key removed via settings.");
     res.json({ success: true });
   } catch (err) {
@@ -298,27 +336,26 @@ app.delete("/api/settings/api-key", settingsLimiter, (req, res) => {
 // ---------------------------------------------------------------------------
 // Shutdown (rate-limited, localhost-only)
 // ---------------------------------------------------------------------------
-const shutdownLimiter = rateLimit({
-  windowMs: 60_000,
-  max: 3,
-  message: { error: "Shutdown rate limit reached." },
-});
+const shutdownLimiter = rateLimit({ windowMs: 60_000, max: 3, message: { error: "Shutdown rate limit reached." } });
+let shuttingDown = false;
 
 app.post("/api/shutdown", shutdownLimiter, (req, res) => {
   if (!isLocalhost(req)) {
     return res.status(403).json({ error: "Shutdown is only available from localhost." });
   }
-
+  if (shuttingDown) {
+    return res.status(423).json({ error: "Shutdown already in progress." });
+  }
   const { confirm } = req.body || {};
   if (confirm !== true) {
     return res.status(400).json({ error: "Missing confirmation." });
   }
-
+  shuttingDown = true;
   res.json({ status: "shutting down" });
   setTimeout(() => {
-    // Kill Vite dev server on port 5174
+    // Kill Vite dev server on port 5175
     try {
-      execSync('for /f "tokens=5" %a in (\'netstat -ano ^| findstr ":5174 "\') do taskkill /F /PID %a', { shell: "cmd.exe", stdio: "ignore" });
+      execSync('for /f "tokens=5" %a in (\'netstat -ano ^| findstr ":5175 "\') do taskkill /F /PID %a', { shell: "cmd.exe", stdio: "ignore" });
     } catch { /* may not be running */ }
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 2000);
@@ -337,15 +374,13 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(distPath, "index.html"));
 });
 
-// Bind to localhost only — not exposed to the network
 const server = app.listen(PORT, "127.0.0.1", () => {
-  console.log(`Iron Wolf Phishing Analyzer API running on http://localhost:${PORT}`);
+  console.log(`Iron Wolf Policy Generator API running on http://localhost:${PORT}`);
 });
 
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
-    console.error(`\n  [ERROR] Port ${PORT} is already in use.`);
-    console.error(`  Another instance may be running. Close it and try again.\n`);
+    console.error(`\n  [ERROR] Port ${PORT} is already in use.\n`);
   } else {
     console.error(`\n  [ERROR] Server failed to start:`, err.message, "\n");
   }

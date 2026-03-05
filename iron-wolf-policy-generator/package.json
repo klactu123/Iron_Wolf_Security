@@ -1,7 +1,7 @@
 {
-  "name": "iron-wolf-phishing-analyzer",
+  "name": "iron-wolf-policy-generator",
   "version": "1.0.0",
-  "description": "AI Phishing Email Analyzer - Part of the Iron Wolf AI Security Toolkit",
+  "description": "Security Policy Generator & Reviewer - Part of the Iron Wolf AI Security Toolkit",
   "author": "Iron Wolf Interactive",
   "license": "MIT",
   "type": "module",
