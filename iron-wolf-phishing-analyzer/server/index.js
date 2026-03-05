@@ -316,7 +316,10 @@ app.post("/api/shutdown", shutdownLimiter, (req, res) => {
 
   res.json({ status: "shutting down" });
   setTimeout(() => {
-    // Kill Vite dev server on port 5174
+    // Kill the entire process tree (Express + Vite + concurrently + command window)
+    try {
+      execSync(`taskkill /F /T /PID ${process.ppid}`, { shell: "cmd.exe", stdio: "ignore" });
+    } catch { /* fallback: kill Vite by port, then exit */ }
     try {
       execSync('for /f "tokens=5" %a in (\'netstat -ano ^| findstr ":5174 "\') do taskkill /F /PID %a', { shell: "cmd.exe", stdio: "ignore" });
     } catch { /* may not be running */ }
