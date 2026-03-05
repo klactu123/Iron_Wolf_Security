@@ -1,0 +1,150 @@
+# Iron Wolf AI Phishing Email Analyzer
+
+An AI-powered email threat analysis tool. Paste a suspicious email — headers and body — and get a structured verdict with confidence scoring, red-flag identification, social engineering tactic analysis, and recommended actions. Powered by Claude AI with real-time web search for domain and URL verification.
+
+Built by [Iron Wolf Interactive](https://github.com/Iron-Wolf-Security) - Charlotte, NC
+
+---
+
+## What It Does
+
+1. **Paste** — Drop in a suspicious email (full headers + body for best results, body-only also works).
+2. **Analyze** — Claude investigates the sender domain, checks URLs against known campaigns, and researches referenced organizations using real-time web search.
+3. **Verdict** — Returns a structured 6-section analysis with a clear threat confidence score and recommended actions.
+
+Features:
+- Verdict badge: Malicious / Suspicious / Likely Legitimate with threat confidence %
+- Threat level and attack category classification (credential harvesting, BEC, advance fee fraud, malware delivery, sextortion, etc.)
+- Red flags identified with severity tags and quoted evidence
+- Header analysis (SPF/DKIM/DMARC, sender legitimacy, routing anomalies)
+- URL extraction and risk assessment
+- Social engineering tactic identification with specific quoted phrases
+- Smart email preprocessing — strips HTML, base64, MIME noise to reduce token usage
+- Real-time web search for verified facts (no hallucinated domain data)
+- Sample phishing email included for quick testing
+- Clean dark UI designed for security teams
+
+---
+
+## Requirements
+
+- **Windows 10/11** (or any OS with Node.js)
+- **Node.js 18+** — [Download](https://nodejs.org/)
+- **Anthropic API key** — [Get one at console.anthropic.com](https://console.anthropic.com/)
+
+---
+
+## Quick Start
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure your API key
+
+Add your Anthropic API key to the `.env` file:
+
+```
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+```
+
+Or set it from within the app — click the **Claude** button in the top-right corner and use the key input there.
+
+### 3. Launch the app
+
+Double-click **`Start Phishing Analyzer.bat`** or run manually:
+
+```bash
+npm run dev
+```
+
+This starts the backend (port 3002) and frontend (port 5174), then opens the app in your browser.
+
+### 4. Use it
+
+- Paste a suspicious email into the text area (include headers if available)
+- Click **Analyze Email**
+- Review the verdict, red flags, and recommended actions
+- Use the **Shutdown** button in the footer when you're done
+
+---
+
+## Project Structure
+
+```
+iron-wolf-phishing-analyzer/
+  server/                          Express API (Claude bridge, email preprocessor)
+    index.js                       API endpoints, security middleware, rate limiting
+    providers.js                   Claude API with web search + retry logic
+    preprocessor.js                Email trimming (HTML, base64, MIME stripping)
+  src/                             React frontend (Vite + Tailwind CSS)
+    components/                    UI components (input, analysis cards, badges)
+    hooks/                         Streaming state machine
+    prompts/                       Claude system prompt (core analysis methodology)
+    utils/                         API calls, email parsers
+  Start Phishing Analyzer.bat     Double-click to launch
+  cleanup-ports.bat                Fix "port in use" errors
+```
+
+---
+
+## Tech Stack
+
+- **Frontend**: React 18 + Vite + Tailwind CSS 4
+- **Backend**: Node.js + Express
+- **AI**: Claude API (claude-sonnet-4-6) with web search tool
+- **Security**: Helmet CSP, CORS restrictions, rate limiting, input validation, prompt injection defense, localhost-only binding
+- **No database** — everything runs locally, no data stored
+
+---
+
+## Security
+
+This tool was built with security-first design:
+
+- Server binds to `127.0.0.1` only (not exposed to your network)
+- API key stored server-side only, never sent to the browser
+- API key charset validation prevents `.env` injection attacks
+- Prompt injection defense with XML delimiters and explicit anti-injection rules
+- URLs in analysis output are non-clickable (prevents accidentally clicking malicious links)
+- Rate limiting on all endpoints (analyze: 20/min, settings: 5/min, shutdown: 3/min)
+- SSE stream timeout (3 minutes max) prevents resource exhaustion
+- Email preprocessor strips noise before sending to Claude (reduces token cost)
+- `.gitignore` protects `.env` from accidental commits
+
+---
+
+## Troubleshooting
+
+**App won't start / port in use**
+The launcher automatically cleans up stale processes. If it persists, run `cleanup-ports.bat` manually.
+
+**"Stream failed" or "Analysis failed" error**
+Make sure `ANTHROPIC_API_KEY` is set in your `.env` file. Click the **Claude** button in the top-right to check API status.
+
+**Rate limit errors**
+Large emails with many URLs consume more API tokens. Wait 60 seconds and try again, or trim unnecessary content (long disclaimers, quoted reply chains) before pasting.
+
+**"Email content exceeds maximum size"**
+The limit is 500KB. Strip out base64 attachments, embedded images, or long HTML before pasting — the analyzer only needs headers + body text.
+
+---
+
+## Part of the Iron Wolf AI Security Toolkit
+
+| Tool | Description |
+|------|-------------|
+| [CVE Translator](https://github.com/Iron-Wolf-Security/iron-wolf-cve-translator) | Plain-English CVE/vulnerability summaries |
+| **Phishing Analyzer** | AI-powered email threat analysis (this tool) |
+| AI Vuln Dashboard | Vulnerability prioritization dashboard |
+| Policy Generator | Security policy drafting & review |
+| Log Narrator | Log anomaly detection & explanation |
+| Threat Intel Brief | IOC-to-intel-brief generator |
+
+---
+
+## License
+
+MIT — Free to use, modify, and distribute.

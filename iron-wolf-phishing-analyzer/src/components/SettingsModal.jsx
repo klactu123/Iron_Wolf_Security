@@ -1,0 +1,236 @@
+import { useState, useEffect, useCallback } from "react";
+import { Settings, X, CheckCircle, Cpu, AlertTriangle, Key, Trash2 } from "lucide-react";
+import { saveApiKey, deleteApiKey } from "../utils/api";
+
+export default function SettingsModal() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [claudeStatus, setClaudeStatus] = useState("checking");
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [keyValue, setKeyValue] = useState("");
+  const [keySaving, setKeySaving] = useState(false);
+  const [keyMessage, setKeyMessage] = useState(null);
+  const [keyDeleting, setKeyDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const checkStatus = useCallback(() => {
+    setClaudeStatus("checking");
+    fetch("/api/health")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.hasClaudeKey) {
+          setClaudeStatus("connected");
+        } else {
+          setClaudeStatus("no-key");
+        }
+      })
+      .catch(() => { setClaudeStatus("unavailable"); });
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      checkStatus();
+      setShowKeyInput(false);
+      setKeyValue("");
+      setKeyMessage(null);
+      setConfirmDelete(false);
+    }
+  }, [isOpen, checkStatus]);
+
+  const handleDeleteKey = async () => {
+    setKeyDeleting(true);
+    setKeyMessage(null);
+    try {
+      await deleteApiKey();
+      setConfirmDelete(false);
+      setKeyMessage({ type: "success", text: "API key deleted successfully." });
+      checkStatus();
+    } catch (err) {
+      setKeyMessage({ type: "error", text: err.message });
+    } finally {
+      setKeyDeleting(false);
+    }
+  };
+
+  const handleSaveKey = async () => {
+    setKeySaving(true);
+    setKeyMessage(null);
+    try {
+      await saveApiKey(keyValue);
+      setKeyValue("");
+      setShowKeyInput(false);
+      setKeyMessage({ type: "success", text: "API key saved successfully." });
+      checkStatus();
+    } catch (err) {
+      setKeyMessage({ type: "error", text: err.message });
+    } finally {
+      setKeySaving(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setIsOpen(true)}
+        className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors"
+      >
+        <Settings size={16} />
+        <Cpu size={14} />
+        <span>Claude</span>
+      </button>
+
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Cpu size={20} /> Claude API Status
+              </h2>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-zinc-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className={`mb-5 p-3 border rounded-lg ${
+              claudeStatus === "connected"
+                ? "bg-green-950/30 border-green-800"
+                : claudeStatus === "no-key"
+                ? "bg-red-950/30 border-red-800"
+                : claudeStatus === "unavailable"
+                ? "bg-red-950/30 border-red-800"
+                : "bg-zinc-800 border-zinc-700"
+            }`}>
+              {claudeStatus === "checking" && (
+                <p className="text-sm text-zinc-400">Checking Claude API status...</p>
+              )}
+              {claudeStatus === "connected" && (
+                <div>
+                  <p className="text-sm text-green-400 flex items-center gap-2">
+                    <CheckCircle size={16} /> Claude API connected
+                  </p>
+                  {!showKeyInput && !confirmDelete && (
+                    <div className="flex gap-3 mt-2">
+                      <button
+                        onClick={() => { setShowKeyInput(true); setKeyMessage(null); setConfirmDelete(false); }}
+                        className="text-xs text-zinc-500 hover:text-zinc-300 underline transition-colors"
+                      >
+                        Change API Key
+                      </button>
+                      <button
+                        onClick={() => { setConfirmDelete(true); setKeyMessage(null); setShowKeyInput(false); }}
+                        className="text-xs text-red-500 hover:text-red-400 underline transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 size={12} /> Delete API Key
+                      </button>
+                    </div>
+                  )}
+                  {confirmDelete && (
+                    <div className="mt-2 p-2 bg-red-950/40 border border-red-800 rounded-lg">
+                      <p className="text-xs text-red-300 mb-2">
+                        Are you sure? This will remove the API key from the server and .env file.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleDeleteKey}
+                          disabled={keyDeleting}
+                          className="px-3 py-1 text-xs bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors"
+                        >
+                          {keyDeleting ? "Deleting..." : "Yes, Delete"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(false)}
+                          className="px-3 py-1 text-xs bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {claudeStatus === "no-key" && (
+                <>
+                  <p className="text-sm text-red-400 flex items-center gap-2 mb-2">
+                    <AlertTriangle size={16} /> API key not configured
+                  </p>
+                  <p className="text-xs text-zinc-400 mb-2">
+                    Get an API key from{" "}
+                    <a
+                      href="https://console.anthropic.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 underline"
+                    >
+                      console.anthropic.com
+                    </a>
+                    {" "}and paste it below.
+                  </p>
+                </>
+              )}
+              {claudeStatus === "unavailable" && (
+                <>
+                  <p className="text-sm text-red-400 flex items-center gap-2 mb-2">
+                    <AlertTriangle size={16} /> Server unavailable
+                  </p>
+                  <p className="text-xs text-zinc-400">
+                    Cannot reach the backend server. Make sure it is running.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {(claudeStatus === "no-key" || showKeyInput) && (
+              <div className="mb-5 p-3 bg-zinc-800 border border-zinc-700 rounded-lg">
+                <label className="text-xs text-zinc-400 flex items-center gap-1.5 mb-2">
+                  <Key size={12} /> Anthropic API Key
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={keyValue}
+                    onChange={(e) => setKeyValue(e.target.value)}
+                    placeholder="sk-ant-..."
+                    className="flex-1 px-3 py-1.5 text-sm bg-zinc-900 border border-zinc-600 rounded-lg text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+                    disabled={keySaving}
+                  />
+                  <button
+                    onClick={handleSaveKey}
+                    disabled={keySaving || !keyValue.startsWith("sk-ant-")}
+                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors"
+                  >
+                    {keySaving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+                {showKeyInput && (
+                  <button
+                    onClick={() => { setShowKeyInput(false); setKeyMessage(null); }}
+                    className="mt-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            )}
+
+            {keyMessage && (
+              <p className={`mb-4 text-xs ${keyMessage.type === "success" ? "text-green-400" : "text-red-400"}`}>
+                {keyMessage.text}
+              </p>
+            )}
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setIsOpen(false)}
+                className="px-4 py-2 text-sm bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@media print {
+  body,
+  #root,
+  .bg-zinc-950 {
+    background: white !important;
+    color: black !important;
+  }
+
+  .print\:hidden,
+  header,
+  footer,
+  button {
+    display: none !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  .bg-zinc-900 {
+    background: #f8f8f8 !important;
+    border-color: #ddd !important;
+  }
+
+  .border-l-4.border-blue-500 { border-left-color: #3b82f6 !important; }
+  .border-l-4.border-orange-500 { border-left-color: #f97316 !important; }
+  .border-l-4.border-purple-500 { border-left-color: #a855f7 !important; }
+  .border-l-4.border-red-500 { border-left-color: #ef4444 !important; }
+  .border-l-4.border-green-500 { border-left-color: #22c55e !important; }
+  .border-l-4.border-yellow-500 { border-left-color: #eab308 !important; }
+  .border-l-4.border-cyan-500 { border-left-color: #06b6d4 !important; }
+  .border-l-4.border-zinc-500 { border-left-color: #71717a !important; }
+
+  .text-zinc-100, .text-zinc-200, .text-zinc-300 {
+    color: #1a1a1a !important;
+  }
+  .text-zinc-400, .text-zinc-500, .text-zinc-600 {
+    color: #555 !important;
+  }
+
+  .print-section {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
