@@ -106,8 +106,3 @@ These Terms constitute the entire agreement between you and Iron Wolf Interactiv
 with respect to your use of the Iron Wolf AI Security Toolkit and supersede all
 prior or contemporaneous representations, understandings, agreements, or
 communications, whether written or oral, relating to that subject matter.
-
-## Contact
-
-For questions about these terms, visit the Iron Wolf Interactive project
-repository or reach out through the project's issue tracker.
