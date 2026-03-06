@@ -100,6 +100,13 @@ You are free to distribute these tools to others, provided that:
 3. You do not hold Iron Wolf Interactive liable for any use by downstream
    recipients.
 
+## Entire Agreement
+
+These Terms constitute the entire agreement between you and Iron Wolf Interactive
+with respect to your use of the Iron Wolf AI Security Toolkit and supersede all
+prior or contemporaneous representations, understandings, agreements, or
+communications, whether written or oral, relating to that subject matter.
+
 ## Contact
 
 For questions about these terms, visit the Iron Wolf Interactive project
