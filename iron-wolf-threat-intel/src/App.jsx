@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Shield, Settings, Copy, Printer, Power, AlertTriangle, CheckCircle } from "lucide-react";
+import { Shield, Settings, Cpu, Copy, Printer, Power, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import IocInput from "./components/IocInput.jsx";
 import BriefOutput from "./components/BriefOutput.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
@@ -8,7 +8,6 @@ import { fetchHealth, shutdownServer } from "./utils/api.js";
 
 export default function App() {
   const { state, markdown, statusText, error, analyze, reset } = useThreatStream();
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [hasKey, setHasKey] = useState(null);
   const [copied, setCopied] = useState(false);
 
@@ -17,7 +16,7 @@ export default function App() {
     fetchHealth()
       .then((data) => setHasKey(data.hasClaudeKey ?? null))
       .catch(() => setHasKey(null));
-  }, [settingsOpen]);
+  }, []);
 
   function handleAnalyze(iocs, context) {
     analyze(iocs, context);
@@ -37,7 +36,6 @@ export default function App() {
   }
 
   async function handleShutdown() {
-    if (!window.confirm("Shut down the Threat Intel Brief server? This will close all connections.")) return;
     try {
       await shutdownServer();
     } catch { /* server killed itself */ }
@@ -50,70 +48,42 @@ export default function App() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
       {/* Header */}
-      <header className="bg-zinc-900 border-b border-zinc-800 px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+      <header className="border-b border-zinc-800 px-6 py-4 print:hidden">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Shield className="w-8 h-8 text-amber-400" />
+            <Shield size={28} className="text-blue-500" />
             <div>
-              <h1 className="text-lg font-bold tracking-tight">Iron Wolf Threat Intel Brief</h1>
+              <h1 className="text-xl font-bold tracking-tight">Iron Wolf Threat Intel Brief</h1>
               <p className="text-xs text-zinc-500">IOC-to-Intelligence Brief Generator</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {hasOutput && (
-              <>
-                <button
-                  onClick={handleCopy}
-                  className="no-print flex items-center gap-1 px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors"
-                >
-                  {copied ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? "Copied" : "Copy"}
-                </button>
-                <button
-                  onClick={handlePrint}
-                  className="no-print flex items-center gap-1 px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors"
-                >
-                  <Printer className="w-3.5 h-3.5" /> Print
-                </button>
-              </>
-            )}
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="no-print flex items-center gap-1 px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors"
-            >
-              <Settings className="w-3.5 h-3.5" /> Settings
-            </button>
-            <button
-              onClick={handleShutdown}
-              className="no-print flex items-center gap-1 px-3 py-1.5 text-xs bg-zinc-800 hover:bg-red-900/50 text-zinc-400 hover:text-red-400 rounded-lg transition-colors"
-              title="Shutdown server"
-            >
-              <Power className="w-3.5 h-3.5" />
-            </button>
+            <SettingsModal onKeyChange={() => {
+              fetchHealth()
+                .then((data) => setHasKey(data.hasClaudeKey ?? null))
+                .catch(() => setHasKey(null));
+            }} />
           </div>
         </div>
       </header>
 
-      {/* API key warning */}
-      {hasKey === false && (
-        <div className="bg-yellow-900/30 border-b border-yellow-700/30 px-6 py-2">
-          <div className="max-w-5xl mx-auto flex items-center gap-2 text-sm text-yellow-400">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            No API key configured.
-            <button onClick={() => setSettingsOpen(true)} className="underline hover:text-yellow-300">
-              Add one in Settings
-            </button>
-            to enable analysis.
-          </div>
-        </div>
-      )}
-
       {/* Main content */}
       <main className="flex-1 px-6 py-8">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-4xl mx-auto">
+          {/* API key warning */}
+          {hasKey === false && (
+            <div className="mb-6 flex items-start gap-3 px-4 py-3 bg-yellow-950/50 border border-yellow-800 rounded-xl print:hidden">
+              <AlertTriangle size={18} className="text-yellow-400 mt-0.5 shrink-0" />
+              <p className="text-sm text-yellow-300">
+                No API key configured. Set <code className="bg-zinc-800 px-1 rounded text-xs">ANTHROPIC_API_KEY</code> in
+                your <code className="bg-zinc-800 px-1 rounded text-xs">.env</code> file, or use Settings to add your key.
+              </p>
+            </div>
+          )}
+
           {/* Input section — hide when streaming/complete */}
           {!hasOutput && (
-            <div className="no-print mb-8">
+            <div className="print:hidden mb-8">
               <div className="mb-6">
                 <h2 className="text-xl font-semibold text-zinc-100 mb-1">Generate Threat Intelligence Brief</h2>
                 <p className="text-sm text-zinc-400">
@@ -127,30 +97,46 @@ export default function App() {
 
           {/* Status indicator */}
           {statusText && (
-            <div className="no-print flex items-center gap-2 mb-4 text-sm text-amber-400">
-              <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-              {statusText}
+            <div className="mb-6 flex items-center justify-center gap-3 px-4 py-3 bg-blue-950/30 border border-blue-800/50 rounded-xl print:hidden">
+              <Loader2 size={16} className="text-blue-400 animate-spin" />
+              <span className="text-sm text-blue-300">{statusText}</span>
             </div>
           )}
 
           {/* Error display */}
           {error && (
-            <div className="mb-4 p-4 bg-red-900/20 border border-red-700/30 rounded-xl text-sm text-red-400">
-              {error}
+            <div className="mb-6 flex items-start gap-3 px-4 py-3 bg-red-950/50 border border-red-800 rounded-xl print:hidden">
+              <AlertTriangle size={18} className="text-red-400 mt-0.5 shrink-0" />
+              <p className="text-sm text-red-300">{error}</p>
             </div>
           )}
 
           {/* Brief output */}
           <BriefOutput markdown={markdown} isStreaming={isStreaming} isComplete={isComplete} />
 
-          {/* New analysis button */}
-          {isComplete && (
-            <div className="no-print mt-6 flex justify-center">
+          {/* Action bar */}
+          {hasOutput && (
+            <div className="print:hidden mt-6 flex items-center justify-center gap-3">
+              {isComplete && (
+                <button
+                  onClick={reset}
+                  className="px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors"
+                >
+                  Start Over
+                </button>
+              )}
               <button
-                onClick={reset}
-                className="px-6 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-medium transition-colors"
+                onClick={handleCopy}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors"
               >
-                New Analysis
+                {copied ? <CheckCircle size={14} className="text-green-400" /> : <Copy size={14} />}
+                {copied ? "Copied!" : "Copy"}
+              </button>
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors"
+              >
+                <Printer size={14} /> Print
               </button>
             </div>
           )}
@@ -158,14 +144,19 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="no-print bg-zinc-900 border-t border-zinc-800 px-6 py-3">
-        <div className="max-w-5xl mx-auto flex items-center justify-between text-xs text-zinc-500">
-          <span>Iron Wolf Interactive | AI Security Toolkit</span>
-          <span>Threat Intel Brief Generator v1.0</span>
+      <footer className="border-t border-zinc-800 px-6 py-4 print:hidden">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <p className="text-xs text-zinc-600">
+            &copy; {new Date().getFullYear()} Iron Wolf Interactive &middot; AI Security Toolkit
+          </p>
+          <button
+            onClick={handleShutdown}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-green-900/30 hover:bg-red-900/50 text-green-500 hover:text-red-400 border border-green-800/50 hover:border-red-800/50 transition-colors"
+          >
+            <Power size={16} /> Shutdown
+          </button>
         </div>
       </footer>
-
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

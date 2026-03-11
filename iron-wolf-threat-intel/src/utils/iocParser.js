@@ -17,9 +17,11 @@ const IOC_PATTERNS = {
 /**
  * Detect IOC type for a single value.
  */
+const MAX_TOKEN_LENGTH = 2048;
+
 export function detectIocType(value) {
   const trimmed = value.trim();
-  if (!trimmed) return null;
+  if (!trimmed || trimmed.length > MAX_TOKEN_LENGTH) return null;
 
   // Order matters — check most specific first
   if (IOC_PATTERNS.sha256.test(trimmed) && trimmed.length === 64) return "SHA-256";
@@ -45,7 +47,7 @@ export function parseIocs(input) {
   const tokens = input
     .split(/[\n,]+/)
     .map((t) => t.trim())
-    .filter((t) => t.length >= 3);
+    .filter((t) => t.length >= 3 && t.length <= MAX_TOKEN_LENGTH);
 
   const seen = new Set();
   const results = [];

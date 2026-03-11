@@ -3,11 +3,12 @@ const API_BASE = "/api";
 // ---------------------------------------------------------------------------
 // SSE streaming for threat intel analysis
 // ---------------------------------------------------------------------------
-export async function analyzeStream(iocs, context, onText, onStatus, onDone, onError) {
+export async function analyzeStream(iocs, context, onText, onStatus, onDone, onError, signal) {
   const res = await fetch(`${API_BASE}/analyze/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ iocs, context }),
+    signal,
   });
 
   if (!res.ok) {

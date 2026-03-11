@@ -9,12 +9,26 @@ import { execSync } from "child_process";
 import path from "path";
 import fs from "fs";
 import { stream, hasApiKey, resetClient } from "./providers.js";
+import { getSystemPrompt } from "../src/prompts/system.js";
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = process.env.PORT || 3004;
+const PORT = Math.min(65535, Math.max(1024, parseInt(process.env.PORT) || 3004));
+
+// ---------------------------------------------------------------------------
+// CSRF defense: require JSON content-type on all POST/DELETE
+// ---------------------------------------------------------------------------
+app.use((req, res, next) => {
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
+    const ct = req.headers["content-type"] || "";
+    if (!ct.includes("application/json")) {
+      return res.status(415).json({ error: "Content-Type must be application/json." });
+    }
+  }
+  next();
+});
 
 // SECURITY: Do NOT enable trust proxy — prevents X-Forwarded-For spoofing
 app.set("trust proxy", false);
@@ -103,9 +117,21 @@ function getClaudeErrorMessage(error) {
 // ---------------------------------------------------------------------------
 const MAX_IOC_LENGTH = 100_000; // 100KB max input
 const MIN_IOC_LENGTH = 3;
+const MAX_CONTEXT_LENGTH = 5_000;
+
+// Basic IOC pattern check — at least one must match
+const IOC_PATTERNS = [
+  /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/,  // IPv4
+  /\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b/,  // IPv6
+  /\b[a-fA-F0-9]{32}\b/, /\b[a-fA-F0-9]{40}\b/, /\b[a-fA-F0-9]{64}\b/,  // Hashes
+  /\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b/,  // Domain
+  /https?:\/\/[^\s]+/i,  // URL
+  /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/,  // Email
+  /\bCVE-\d{4}-\d{4,}\b/i,  // CVE
+];
 
 function validateIocInput(req, res) {
-  const { iocs } = req.body;
+  const { iocs, context } = req.body;
   if (!iocs || typeof iocs !== "string") {
     res.status(400).json({ error: "Missing or invalid IOC input." });
     return false;
@@ -117,6 +143,18 @@ function validateIocInput(req, res) {
   if (iocs.length > MAX_IOC_LENGTH) {
     res.status(400).json({ error: "Input exceeds maximum size (100KB)." });
     return false;
+  }
+  // Must contain at least one recognizable IOC pattern
+  if (!IOC_PATTERNS.some((p) => p.test(iocs))) {
+    res.status(400).json({ error: "No recognizable IOCs found. Enter IP addresses, domains, hashes, URLs, emails, or CVE IDs." });
+    return false;
+  }
+  // Validate optional org context
+  if (context !== undefined && context !== null) {
+    if (typeof context !== "string" || context.length > MAX_CONTEXT_LENGTH) {
+      res.status(400).json({ error: "Organization context exceeds maximum size (5KB)." });
+      return false;
+    }
   }
   return true;
 }
@@ -162,12 +200,11 @@ app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
   }, STREAM_TIMEOUT_MS);
 
   try {
-    const { getSystemPrompt } = await import("../src/prompts/system.js");
     const systemPrompt = getSystemPrompt();
 
     let contextBlock = "";
     if (context && typeof context === "string" && context.trim().length > 0) {
-      const safeContext = context.slice(0, 5000);
+      const safeContext = context.slice(0, MAX_CONTEXT_LENGTH);
       contextBlock = `\n\nOrganizational context (use to tailor risk assessment and recommendations):\n<org_context>\n${safeContext}\n</org_context>`;
     }
 
@@ -181,7 +218,7 @@ app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
     if (!aborted) res.end();
   } catch (error) {
     clearTimeout(streamTimeout);
-    console.error("API error:", (error.message || "unknown").substring(0, 200).replace(/sk-ant-[a-zA-Z0-9_-]+/g, "[REDACTED]"));
+    console.error("API error:", (error.message || "unknown").substring(0, 200).replace(/sk-ant-[a-zA-Z0-9_-]+/g, "[REDACTED]").replace(/https?:\/\/[^\s]+/g, "[URL]"));
     if (!res.writableEnded) {
       const userMessage = getClaudeErrorMessage(error);
       res.write(`data: ${JSON.stringify({ type: "error", error: userMessage })}\n\n`);
@@ -219,6 +256,10 @@ app.post("/api/settings/api-key", settingsLimiter, (req, res) => {
     return res.status(400).json({ error: "Invalid API key format." });
   }
   if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
+    return res.status(400).json({ error: "API key contains invalid characters." });
+  }
+  // Defense-in-depth: explicit newline/null check
+  if (/[\n\r\0]/.test(key)) {
     return res.status(400).json({ error: "API key contains invalid characters." });
   }
 

@@ -31,7 +31,7 @@ function getSectionMeta(title) {
 // Safe link renderer
 // ---------------------------------------------------------------------------
 function SafeLink({ href, children }) {
-  const isAbsoluteSafe = href && (href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:"));
+  const isAbsoluteSafe = href && (href.startsWith("http://") || href.startsWith("https://"));
   if (!isAbsoluteSafe) return <span className="text-zinc-400">{children}</span>;
   try {
     const parsed = new URL(href);
@@ -51,6 +51,7 @@ function SafeLink({ href, children }) {
 // ---------------------------------------------------------------------------
 const mdComponents = {
   a: SafeLink,
+  img: ({ alt }) => <span className="text-zinc-400">[Image: {alt || "removed"}]</span>,
   h3: ({ children }) => <h3 className="text-base font-semibold text-zinc-100 mt-4 mb-2">{children}</h3>,
   h4: ({ children }) => <h4 className="text-sm font-semibold text-zinc-200 mt-3 mb-1">{children}</h4>,
   p: ({ children }) => <p className="text-sm text-zinc-300 mb-2 leading-relaxed">{children}</p>,
@@ -84,7 +85,7 @@ function TableOfContents({ sections }) {
   if (sections.length === 0) return null;
 
   return (
-    <div className="mb-6 bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 no-print">
+    <div className="mb-6 bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 print:hidden">
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2 text-sm font-medium text-zinc-300 hover:text-zinc-100 transition-colors w-full"
@@ -175,7 +176,7 @@ export default function BriefOutput({ markdown, isStreaming, isComplete }) {
           >
             <h2 className={`flex items-center gap-2 text-base font-bold ${meta.accent} mb-3`}>
               <Icon className="w-5 h-5" />
-              {section.title}
+              {section.title.slice(0, 100)}
             </h2>
             <div className="prose-sm">
               <ReactMarkdown components={mdComponents} skipHtml>
