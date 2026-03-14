@@ -1,0 +1,132 @@
+Iron Wolf Iran Conflict Intelligence Brief Generator
+=====================================================
+
+Part of the Iron Wolf AI Security Toolkit.
+
+Generates comprehensive, AI-researched executive intelligence briefs on the
+current Iran conflict and its impact on U.S. sectors -- energy, retail,
+healthcare, telecom, financial services, defense, transportation, agriculture,
+manufacturing, and insurance. Includes a sector-by-sector impact dashboard,
+cyber threat assessment, domestic extremism report, and actionable
+recommendations for executive leadership.
+
+Sourced from Reuters, AP, Bloomberg, CISA, FBI, and other authoritative
+outlets with inline source links for verification.
+
+
+REQUIREMENTS
+------------
+Before using this application you need the following installed on your system:
+
+1. Node.js (version 18 or higher)
+   - Download: https://nodejs.org
+   - Verify: open a terminal and run "node --version"
+
+2. npm (included with Node.js)
+   - Verify: run "npm --version"
+
+3. Anthropic API Key
+   - Sign up at https://console.anthropic.com
+   - Create an API key (starts with "sk-ant-")
+   - You will need credit on your Anthropic account to generate briefs
+   - Each brief uses approximately 10-15 web searches and produces 8-16K
+     tokens of output
+
+4. A modern web browser (Chrome, Edge, Firefox, or Safari)
+
+
+QUICK START
+-----------
+1. Double-click "Start Threat Intel Brief.bat"
+   - This installs dependencies automatically on first run
+2. Your browser will open to http://localhost:5176
+3. If first run, click the Claude settings button (top right) and enter
+   your Anthropic API key
+4. Click "Generate Intelligence Brief"
+5. Wait 2-5 minutes while the AI researches and writes the brief
+6. Use "Download PDF" to export
+
+
+MANUAL START
+------------
+1. Open a terminal in this folder
+2. Run: npm install
+3. Run: npm run dev
+4. Open http://localhost:5176 in your browser
+
+
+API KEY SETUP
+-------------
+You have two options to configure your API key:
+
+Option A - Settings Modal (recommended):
+  Click the "Claude" button in the top-right corner and enter your key.
+  It will be saved to the .env file automatically.
+
+Option B - Manual .env file:
+  Create a file called ".env" in this folder with:
+    ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+
+PORTS
+-----
+- Frontend (Vite dev server): 5176
+- Backend (Express API):      3004
+
+If these ports are in use, run "cleanup-ports.bat" to free them.
+
+
+OUTPUT FORMATS
+--------------
+- PDF:      Download a formatted PDF with dark theme and sector grid
+- Archive:  Briefs are auto-saved and accessible from the Archive panel
+
+
+BRIEF SECTIONS
+--------------
+Each generated brief contains 9 sections:
+
+1. Executive Summary      - Bottom-line assessment and threat level
+2. Situation Update       - Military operations and diplomatic status
+3. Sector Impact Dashboard - 10-sector grid with impact levels and metrics
+4. Energy Deep Dive       - Oil prices, Strait of Hormuz, gas prices
+5. Economic & Market Impact - Stock indices, currency, bonds, inflation
+6. Cyber Threat Landscape  - Iranian APTs, CISA advisories, recent attacks
+7. Domestic Threat Report  - Extremism, hate crimes, FBI advisories
+8. Recommended Actions    - Immediate, short-term, and strategic steps
+9. Sources & Confidence   - Full source list with links
+
+
+SECURITY NOTES
+--------------
+- Server binds to localhost only (127.0.0.1) -- not accessible from network
+- API key stored server-side in .env file, never sent to the browser
+- Rate-limited endpoints prevent abuse
+- All input validated and size-limited
+- CORS restricted to localhost origins
+- Settings and shutdown endpoints require localhost access
+- Brief archive restricted to localhost access
+
+
+TROUBLESHOOTING
+---------------
+"No API key configured" warning:
+  Click the Claude button (top right) and enter your Anthropic API key.
+
+"API credit balance is too low":
+  Add credits at https://console.anthropic.com/settings/billing
+
+Port already in use:
+  Run "cleanup-ports.bat" or manually kill processes on ports 5176/3004.
+
+Brief generation times out:
+  The 7-minute timeout allows for extensive web research. If it times out,
+  try again -- the Claude API may have been temporarily overloaded.
+
+Blank or missing PDF content:
+  Make sure the brief has fully completed before clicking Download PDF.
+
+
+LICENSE
+-------
+See TERMS_OF_USE.txt for usage terms.

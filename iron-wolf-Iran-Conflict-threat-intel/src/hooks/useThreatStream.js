@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { analyzeStream } from "../utils/api.js";
 
 /**
- * Streaming state machine for threat intel brief generation.
+ * Streaming state machine for executive threat intel brief generation.
  * States: IDLE -> STREAMING -> COMPLETE (or ERROR)
  */
 export function useThreatStream() {
@@ -10,22 +10,21 @@ export function useThreatStream() {
   const [markdown, setMarkdown] = useState("");
   const [statusText, setStatusText] = useState("");
   const [error, setError] = useState(null);
-  const abortRef = useRef(null); // AbortController
+  const abortRef = useRef(null);
 
-  const analyze = useCallback(async (iocs, context) => {
-    // Abort any previous request
+  const analyze = useCallback(async (focus, context) => {
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     setMarkdown("");
     setError(null);
-    setStatusText("Initializing analysis...");
+    setStatusText("Initializing intelligence brief...");
     setState("STREAMING");
 
     try {
       await analyzeStream(
-        iocs,
+        focus,
         context,
         // onText
         (text) => {
@@ -55,9 +54,9 @@ export function useThreatStream() {
       // If stream ended without explicit done event
       setState((prev) => (prev === "STREAMING" ? "COMPLETE" : prev));
     } catch (err) {
-      if (err.name === "AbortError") return; // user cancelled
+      if (err.name === "AbortError") return;
       if (!controller.signal.aborted) {
-        setError(err.message || "Analysis failed. Please try again.");
+        setError(err.message || "Brief generation failed. Please try again.");
         setState("ERROR");
       }
     }
@@ -72,5 +71,15 @@ export function useThreatStream() {
     setError(null);
   }, []);
 
-  return { state, markdown, statusText, error, analyze, reset };
+  // Load archived brief directly (no streaming)
+  const setMarkdownDirect = useCallback((md) => {
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = null;
+    setMarkdown(md);
+    setStatusText("");
+    setError(null);
+    setState("COMPLETE");
+  }, []);
+
+  return { state, markdown, statusText, error, analyze, reset, setMarkdownDirect };
 }

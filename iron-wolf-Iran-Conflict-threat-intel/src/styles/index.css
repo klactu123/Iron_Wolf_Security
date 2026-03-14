@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+/* Print styles — preserve dark theme to match the website */
+@media print {
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  body {
+    background: #09090b !important; /* zinc-950 */
+    color: #f4f4f5 !important;
+    font-size: 11pt;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide non-print elements */
+  .no-print,
+  .print\:hidden,
+  button,
+  textarea,
+  input,
+  header,
+  footer {
+    display: none !important;
+  }
+
+  /* Brief output takes full width */
+  .brief-output {
+    max-width: 100% !important;
+    padding: 8pt !important;
+    margin: 0 !important;
+  }
+
+  /* ---------------------------------------------------------------
+     DOCUMENT HEADER — dark gradient (matches website)
+     --------------------------------------------------------------- */
+  .doc-header {
+    background: linear-gradient(135deg, #450a0a 0%, #09090b 100%) !important;
+    border: 1px solid rgba(220, 38, 38, 0.2) !important;
+    color: white !important;
+    padding: 20pt !important;
+    margin-bottom: 12pt !important;
+    border-radius: 8pt !important;
+  }
+  .doc-header * { color: white !important; }
+  .doc-header .text-zinc-400,
+  .doc-header .text-zinc-500 { color: #a1a1aa !important; }
+
+  /* ---------------------------------------------------------------
+     SECTION CARDS — dark bg with colored left border (matches website)
+     --------------------------------------------------------------- */
+  .section-card {
+    background-color: rgba(39, 39, 42, 0.5) !important; /* zinc-800/50 */
+    border-top: 1px solid #3f3f46 !important;
+    border-right: 1px solid #3f3f46 !important;
+    border-bottom: 1px solid #3f3f46 !important;
+    border-left-width: 4px !important;
+    border-left-style: solid !important;
+    border-radius: 0 8pt 8pt 0 !important;
+    padding: 14pt !important;
+    margin-bottom: 10pt !important;
+    page-break-inside: avoid;
+  }
+
+  /* Section accent border colors */
+  .section-executive { border-left-color: #ef4444 !important; }
+  .section-situation { border-left-color: #f97316 !important; }
+  .section-sectors { border-left-color: #f59e0b !important; }
+  .section-energy { border-left-color: #f59e0b !important; }
+  .section-retail { border-left-color: #a855f7 !important; }
+  .section-economic { border-left-color: #3b82f6 !important; }
+  .section-cyber { border-left-color: #06b6d4 !important; }
+  .section-domestic { border-left-color: #dc2626 !important; }
+  .section-actions { border-left-color: #22c55e !important; }
+  .section-sources { border-left-color: #71717a !important; }
+
+  /* ---------------------------------------------------------------
+     TEXT COLORS — preserve website colors
+     --------------------------------------------------------------- */
+  .text-white, [class*="text-white"] { color: #ffffff !important; }
+  .text-zinc-100 { color: #f4f4f5 !important; }
+  .text-zinc-200 { color: #e4e4e7 !important; }
+  .text-zinc-300 { color: #d4d4d8 !important; }
+  .text-zinc-400 { color: #a1a1aa !important; }
+  .text-zinc-500 { color: #71717a !important; }
+
+  /* Section header accent colors — match website */
+  [class*="text-red-400"] { color: #f87171 !important; }
+  [class*="text-orange-400"] { color: #fb923c !important; }
+  [class*="text-amber-400"] { color: #fbbf24 !important; }
+  [class*="text-purple-400"] { color: #c084fc !important; }
+  [class*="text-blue-400"] { color: #60a5fa !important; }
+  [class*="text-cyan-400"] { color: #22d3ee !important; }
+  [class*="text-green-400"] { color: #4ade80 !important; }
+  [class*="text-pink-400"] { color: #f472b6 !important; }
+  [class*="text-indigo-400"] { color: #818cf8 !important; }
+  [class*="text-slate-300"] { color: #cbd5e1 !important; }
+  [class*="text-teal-400"] { color: #2dd4bf !important; }
+  [class*="text-rose-400"] { color: #fb7185 !important; }
+
+  /* ---------------------------------------------------------------
+     SECTOR GRID — 2-column, dark card backgrounds (matches website)
+     --------------------------------------------------------------- */
+  .grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8pt !important;
+  }
+
+  /* Sector card backgrounds — dark tinted (matches website) */
+  [class*="bg-amber-950"] { background-color: rgba(69, 26, 3, 0.4) !important; }
+  [class*="bg-purple-950"] { background-color: rgba(59, 7, 100, 0.4) !important; }
+  [class*="bg-pink-950"] { background-color: rgba(80, 7, 36, 0.4) !important; }
+  [class*="bg-indigo-950"] { background-color: rgba(30, 27, 75, 0.4) !important; }
+  [class*="bg-blue-950"] { background-color: rgba(23, 37, 84, 0.4) !important; }
+  [class*="bg-slate-800"] { background-color: rgba(30, 41, 59, 0.4) !important; }
+  [class*="bg-orange-950"] { background-color: rgba(67, 20, 7, 0.4) !important; }
+  [class*="bg-green-950"] { background-color: rgba(5, 46, 22, 0.4) !important; }
+  [class*="bg-teal-950"] { background-color: rgba(4, 47, 46, 0.4) !important; }
+  [class*="bg-rose-950"] { background-color: rgba(76, 5, 25, 0.4) !important; }
+  [class*="bg-zinc-800"] { background-color: rgba(39, 39, 42, 0.5) !important; }
+  [class*="bg-zinc-900"] { background-color: rgba(24, 24, 27, 0.6) !important; }
+
+  /* Sector card borders */
+  [class*="border-amber-700"] { border-color: rgba(180, 83, 9, 0.5) !important; }
+  [class*="border-purple-700"] { border-color: rgba(126, 34, 206, 0.5) !important; }
+  [class*="border-pink-700"] { border-color: rgba(190, 24, 93, 0.5) !important; }
+  [class*="border-indigo-700"] { border-color: rgba(67, 56, 202, 0.5) !important; }
+  [class*="border-blue-700"] { border-color: rgba(29, 78, 216, 0.5) !important; }
+  [class*="border-slate-600"] { border-color: rgba(71, 85, 105, 0.5) !important; }
+  [class*="border-orange-700"] { border-color: rgba(194, 65, 12, 0.5) !important; }
+  [class*="border-green-700"] { border-color: rgba(21, 128, 61, 0.5) !important; }
+  [class*="border-teal-700"] { border-color: rgba(15, 118, 110, 0.5) !important; }
+  [class*="border-rose-700"] { border-color: rgba(190, 18, 60, 0.5) !important; }
+  [class*="border-zinc-700"] { border-color: rgba(63, 63, 70, 0.5) !important; }
+
+  /* ---------------------------------------------------------------
+     IMPACT BADGES — colored pills with white text (matches website)
+     --------------------------------------------------------------- */
+  [class*="bg-red-600"] { background-color: #dc2626 !important; color: white !important; }
+  [class*="bg-orange-600"] { background-color: #ea580c !important; color: white !important; }
+  [class*="bg-yellow-600"] { background-color: #ca8a04 !important; color: white !important; }
+  [class*="bg-green-600"] { background-color: #16a34a !important; color: white !important; }
+  [class*="bg-emerald-700"] { background-color: #047857 !important; color: white !important; }
+  [class*="bg-zinc-600"] { background-color: #52525b !important; color: white !important; }
+
+  /* ---------------------------------------------------------------
+     LINKS — amber to match website
+     --------------------------------------------------------------- */
+  a {
+    color: #fbbf24 !important; /* amber-400 */
+    text-decoration: underline !important;
+  }
+
+  /* ---------------------------------------------------------------
+     TABLE FORMATTING — dark theme
+     --------------------------------------------------------------- */
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #3f3f46; padding: 6pt 8pt; text-align: left; color: #f4f4f5 !important; }
+  th { background-color: #27272a !important; font-weight: bold; }
+
+  /* ---------------------------------------------------------------
+     PAGE BREAKS
+     --------------------------------------------------------------- */
+  h2 { page-break-after: avoid; }
+  .section-card + .section-card { page-break-before: auto; }
+}

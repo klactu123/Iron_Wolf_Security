@@ -86,11 +86,11 @@ app.use(
 
 const analyzeLimiter = rateLimit({
   windowMs: 60_000,
-  max: 15,
-  message: { error: "Analysis rate limit reached. Please wait before trying again." },
+  max: 10,
+  message: { error: "Brief generation rate limit reached. Please wait before trying again." },
 });
 
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "100kb" }));
 
 // ---------------------------------------------------------------------------
 // Error message helper
@@ -109,54 +109,21 @@ function getClaudeErrorMessage(error) {
   if (error.status === 401) {
     return "API authentication failed. Please check your API key in Settings.";
   }
-  return "Service temporarily unavailable. Please try again.";
-}
-
-// ---------------------------------------------------------------------------
-// Input validation
-// ---------------------------------------------------------------------------
-const MAX_IOC_LENGTH = 100_000; // 100KB max input
-const MIN_IOC_LENGTH = 3;
-const MAX_CONTEXT_LENGTH = 5_000;
-
-// Basic IOC pattern check — at least one must match
-const IOC_PATTERNS = [
-  /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/,  // IPv4
-  /\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b/,  // IPv6
-  /\b[a-fA-F0-9]{32}\b/, /\b[a-fA-F0-9]{40}\b/, /\b[a-fA-F0-9]{64}\b/,  // Hashes
-  /\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}\b/,  // Domain
-  /https?:\/\/[^\s]+/i,  // URL
-  /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/,  // Email
-  /\bCVE-\d{4}-\d{4,}\b/i,  // CVE
-];
-
-function validateIocInput(req, res) {
-  const { iocs, context } = req.body;
-  if (!iocs || typeof iocs !== "string") {
-    res.status(400).json({ error: "Missing or invalid IOC input." });
-    return false;
+  if (error.status === 400) {
+    return `Bad request: ${msg.slice(0, 200) || "Invalid request to Claude API."}`;
   }
-  if (iocs.trim().length < MIN_IOC_LENGTH) {
-    res.status(400).json({ error: "Input too short. Please enter at least one IOC." });
-    return false;
+  if (error.status === 404) {
+    return `Model not found: ${msg.slice(0, 200) || "The specified model may not be available on your plan."}`;
   }
-  if (iocs.length > MAX_IOC_LENGTH) {
-    res.status(400).json({ error: "Input exceeds maximum size (100KB)." });
-    return false;
+  if (error.status === 500) {
+    return "Claude API internal error. This is on Anthropic's side — please try again in a minute.";
   }
-  // Must contain at least one recognizable IOC pattern
-  if (!IOC_PATTERNS.some((p) => p.test(iocs))) {
-    res.status(400).json({ error: "No recognizable IOCs found. Enter IP addresses, domains, hashes, URLs, emails, or CVE IDs." });
-    return false;
+  if (error.status === 529) {
+    return "Claude API is temporarily overloaded. Please try again in a few minutes.";
   }
-  // Validate optional org context
-  if (context !== undefined && context !== null) {
-    if (typeof context !== "string" || context.length > MAX_CONTEXT_LENGTH) {
-      res.status(400).json({ error: "Organization context exceeds maximum size (5KB)." });
-      return false;
-    }
-  }
-  return true;
+  // Fallback — include sanitized message for debugging
+  const safeMsg = msg.replace(/sk-ant-[a-zA-Z0-9_-]+/g, "[REDACTED]").slice(0, 200);
+  return `Service error${error.status ? ` (${error.status})` : ""}: ${safeMsg || "Please try again."}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +136,7 @@ const healthLimiter = rateLimit({
 });
 
 app.get("/api/health", healthLimiter, (req, res) => {
-  const body = { status: "ok", tool: "threat-intel" };
+  const body = { status: "ok", tool: "threat-intel-brief" };
   if (isLocalhost(req)) {
     body.hasClaudeKey = hasApiKey();
   }
@@ -177,14 +144,22 @@ app.get("/api/health", healthLimiter, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/analyze/stream — Streaming threat intel brief via SSE
+// POST /api/analyze/stream — Streaming executive intel brief via SSE
 // ---------------------------------------------------------------------------
-const STREAM_TIMEOUT_MS = 180_000;
+const STREAM_TIMEOUT_MS = 420_000; // 7 minutes — Claude needs time for 8-10 web searches + full brief
 
 app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
-  if (!validateIocInput(req, res)) return;
+  // No complex input validation needed — this is a one-button brief generator
+  // Optional: user can pass a focus area or custom context
+  const { focus, context } = req.body || {};
 
-  const { iocs, context } = req.body;
+  // Validate optional fields
+  if (focus && (typeof focus !== "string" || focus.length > 500)) {
+    return res.status(400).json({ error: "Focus field exceeds maximum size." });
+  }
+  if (context && (typeof context !== "string" || context.length > 2000)) {
+    return res.status(400).json({ error: "Context field exceeds maximum size." });
+  }
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -194,7 +169,7 @@ app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
 
   const streamTimeout = setTimeout(() => {
     if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ type: "error", error: "Analysis timed out. Please try again." })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "error", error: "Brief generation timed out. Please try again." })}\n\n`);
       res.end();
     }
   }, STREAM_TIMEOUT_MS);
@@ -202,13 +177,17 @@ app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
   try {
     const systemPrompt = getSystemPrompt();
 
-    let contextBlock = "";
-    if (context && typeof context === "string" && context.trim().length > 0) {
-      const safeContext = context.slice(0, MAX_CONTEXT_LENGTH);
-      contextBlock = `\n\nOrganizational context (use to tailor risk assessment and recommendations):\n<org_context>\n${safeContext}\n</org_context>`;
-    }
+    let userMessage = "Generate a comprehensive executive intelligence brief on the current Iran conflict situation. Research all aspects thoroughly using web search — military status, energy/gas prices, retail impact, economic/market impact, cyber threats, and recommended actions for leadership.";
 
-    const userMessage = `Generate a comprehensive threat intelligence brief for the following indicators of compromise (IOCs). Use web search to research each IOC thoroughly.\n\n<iocs>\n${iocs.trim()}\n</iocs>${contextBlock}`;
+    if (focus && focus.trim()) {
+      const safeFocus = focus.trim().slice(0, 500).replace(/[<>]/g, "");
+      userMessage += `\n\nThe executive team has specifically requested additional focus on: ${safeFocus}`;
+    }
+    if (context && context.trim()) {
+      // Sanitize angle brackets to prevent XML tag escape / prompt injection
+      const safeContext = context.trim().slice(0, 2000).replace(/[<>]/g, "");
+      userMessage += `\n\nOrganizational context for tailored recommendations:\n<org_context>\n${safeContext}\n</org_context>`;
+    }
 
     let aborted = false;
     req.on("close", () => { aborted = true; clearTimeout(streamTimeout); });
@@ -218,7 +197,9 @@ app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
     if (!aborted) res.end();
   } catch (error) {
     clearTimeout(streamTimeout);
-    console.error("API error:", (error.message || "unknown").substring(0, 200).replace(/sk-ant-[a-zA-Z0-9_-]+/g, "[REDACTED]").replace(/https?:\/\/[^\s]+/g, "[URL]"));
+    const safeMsg = (error.message || "unknown").substring(0, 300).replace(/sk-ant-[a-zA-Z0-9_-]+/g, "[REDACTED]");
+    console.error(`API error [status=${error.status || "none"}, type=${error?.error?.type || "unknown"}]:`, safeMsg);
+    if (error?.error?.error?.message) console.error("  Detail:", error.error.error.message.substring(0, 300));
     if (!res.writableEnded) {
       const userMessage = getClaudeErrorMessage(error);
       res.write(`data: ${JSON.stringify({ type: "error", error: userMessage })}\n\n`);
@@ -258,7 +239,6 @@ app.post("/api/settings/api-key", settingsLimiter, (req, res) => {
   if (!/^[a-zA-Z0-9_-]+$/.test(key)) {
     return res.status(400).json({ error: "API key contains invalid characters." });
   }
-  // Defense-in-depth: explicit newline/null check
   if (/[\n\r\0]/.test(key)) {
     return res.status(400).json({ error: "API key contains invalid characters." });
   }
@@ -311,6 +291,141 @@ app.delete("/api/settings/api-key", settingsLimiter, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Brief archive — save and retrieve past briefs
+// ---------------------------------------------------------------------------
+const BRIEFS_DIR = path.join(__dirname, "..", "briefs");
+if (!fs.existsSync(BRIEFS_DIR)) fs.mkdirSync(BRIEFS_DIR, { recursive: true });
+
+const briefsLimiter = rateLimit({ windowMs: 60_000, max: 30, message: { error: "Briefs rate limit reached." } });
+
+// Save a completed brief
+app.post("/api/briefs", briefsLimiter, (req, res) => {
+  if (!isLocalhost(req)) {
+    return res.status(403).json({ error: "Only available from localhost." });
+  }
+  const { markdown, focus, context: orgContext } = req.body || {};
+  if (!markdown || typeof markdown !== "string" || markdown.length < 100) {
+    return res.status(400).json({ error: "Invalid brief content." });
+  }
+  if (markdown.length > 500_000) {
+    return res.status(400).json({ error: "Brief too large." });
+  }
+
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  const timeStr = now.toTimeString().slice(0, 5).replace(":", "-"); // HH-MM
+  const filename = `brief_${dateStr}_${timeStr}.md`;
+
+  // Build file with frontmatter metadata
+  const meta = [
+    "---",
+    `date: ${now.toISOString()}`,
+    `generated: ${now.toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" })}`,
+  ];
+  if (focus) meta.push(`focus: ${String(focus).slice(0, 500).replace(/\n/g, " ")}`);
+  if (orgContext) meta.push(`context: ${String(orgContext).slice(0, 200).replace(/\n/g, " ")}...`);
+  meta.push("---", "");
+
+  const content = meta.join("\n") + markdown;
+
+  try {
+    const filePath = path.join(BRIEFS_DIR, filename);
+    fs.writeFileSync(filePath, content, "utf-8");
+    console.log(`Brief saved: ${filename}`);
+    res.json({ success: true, filename });
+  } catch (err) {
+    console.error("Failed to save brief:", err.message);
+    res.status(500).json({ error: "Failed to save brief." });
+  }
+});
+
+// List all saved briefs
+app.get("/api/briefs", briefsLimiter, (req, res) => {
+  if (!isLocalhost(req)) {
+    return res.status(403).json({ error: "Only available from localhost." });
+  }
+  try {
+    const files = fs.readdirSync(BRIEFS_DIR)
+      .filter(f => f.startsWith("brief_") && f.endsWith(".md"))
+      .sort()
+      .reverse(); // newest first
+
+    const briefs = files.map(f => {
+      const content = fs.readFileSync(path.join(BRIEFS_DIR, f), "utf-8");
+      // Extract frontmatter
+      let date = "";
+      let generated = "";
+      let focus = "";
+      const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      if (fmMatch) {
+        const fm = fmMatch[1];
+        date = fm.match(/^date:\s*(.+)$/m)?.[1] || "";
+        generated = fm.match(/^generated:\s*(.+)$/m)?.[1] || "";
+        focus = fm.match(/^focus:\s*(.+)$/m)?.[1] || "";
+      }
+      // Extract first heading for a preview title
+      const titleMatch = content.match(/^## \d*\.?\s*(.+)$/m);
+      const sizeKb = Math.round(Buffer.byteLength(content, "utf-8") / 1024);
+      return { filename: f, date, generated, focus, sizeKb, title: titleMatch?.[1] || "" };
+    });
+
+    res.json({ briefs });
+  } catch (err) {
+    console.error("Failed to list briefs:", err.message);
+    res.status(500).json({ error: "Failed to list briefs." });
+  }
+});
+
+// Load a specific brief
+app.get("/api/briefs/:filename", briefsLimiter, (req, res) => {
+  if (!isLocalhost(req)) {
+    return res.status(403).json({ error: "Only available from localhost." });
+  }
+  const { filename } = req.params;
+  // Validate filename to prevent path traversal
+  if (!/^brief_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}\.md$/.test(filename)) {
+    return res.status(400).json({ error: "Invalid filename." });
+  }
+  const filePath = path.join(BRIEFS_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "Brief not found." });
+  }
+  try {
+    const content = fs.readFileSync(filePath, "utf-8");
+    // Strip frontmatter before sending markdown
+    const stripped = content.replace(/^---\n[\s\S]*?\n---\n*/, "");
+    res.json({ filename, markdown: stripped });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to read brief." });
+  }
+});
+
+// Delete a specific brief
+app.delete("/api/briefs/:filename", briefsLimiter, (req, res) => {
+  if (!isLocalhost(req)) {
+    return res.status(403).json({ error: "Only available from localhost." });
+  }
+  const { confirm } = req.body || {};
+  if (confirm !== true) {
+    return res.status(400).json({ error: "Missing confirmation." });
+  }
+  const { filename } = req.params;
+  if (!/^brief_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}\.md$/.test(filename)) {
+    return res.status(400).json({ error: "Invalid filename." });
+  }
+  const filePath = path.join(BRIEFS_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "Brief not found." });
+  }
+  try {
+    fs.unlinkSync(filePath);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete brief." });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Shutdown (rate-limited, localhost-only)
 // ---------------------------------------------------------------------------
 const shutdownLimiter = rateLimit({ windowMs: 60_000, max: 3, message: { error: "Shutdown rate limit reached." } });
@@ -330,16 +445,24 @@ app.post("/api/shutdown", shutdownLimiter, (req, res) => {
   shuttingDown = true;
   res.json({ status: "shutting down" });
   setTimeout(() => {
-    // Kill the entire process tree (Express + Vite + concurrently + command window)
+    // Kill parent process tree (concurrently + Vite + this server)
     try {
       execSync(`taskkill /F /T /PID ${process.ppid}`, { shell: "cmd.exe", stdio: "ignore" });
-    } catch { /* fallback: kill Vite by port, then exit */ }
-    try {
-      execSync('for /f "tokens=5" %a in (\'netstat -ano ^| findstr ":5176 "\') do taskkill /F /PID %a', { shell: "cmd.exe", stdio: "ignore" });
-    } catch { /* may not be running */ }
+    } catch { /* ppid may not be valid in all launch modes */ }
+    // Also kill by port in case ppid approach didn't cover Vite
+    for (const port of [5176, 3004]) {
+      try {
+        const out = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { shell: "cmd.exe", encoding: "utf-8" });
+        const pids = [...new Set(out.trim().split(/\r?\n/).map(l => l.trim().split(/\s+/).pop()).filter(p => /^\d+$/.test(p)))];
+        for (const pid of pids) {
+          try { execSync(`taskkill /F /T /PID ${pid}`, { shell: "cmd.exe", stdio: "ignore" }); } catch {}
+        }
+      } catch { /* port not in use */ }
+    }
+    // Graceful close + forced exit
     server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 2000);
-  }, 500);
+    setTimeout(() => process.exit(0), 1000);
+  }, 300);
 });
 
 // ---------------------------------------------------------------------------

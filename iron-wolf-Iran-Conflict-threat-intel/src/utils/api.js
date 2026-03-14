@@ -1,13 +1,13 @@
 const API_BASE = "/api";
 
 // ---------------------------------------------------------------------------
-// SSE streaming for threat intel analysis
+// SSE streaming for executive intel brief generation
 // ---------------------------------------------------------------------------
-export async function analyzeStream(iocs, context, onText, onStatus, onDone, onError, signal) {
+export async function analyzeStream(focus, context, onText, onStatus, onDone, onError, signal) {
   const res = await fetch(`${API_BASE}/analyze/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ iocs, context }),
+    body: JSON.stringify({ focus, context }),
     signal,
   });
 
@@ -73,6 +73,42 @@ export async function deleteApiKey() {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Failed to delete API key");
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// Brief archive
+// ---------------------------------------------------------------------------
+export async function saveBrief(markdown, focus, context) {
+  const res = await fetch(`${API_BASE}/briefs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ markdown, focus, context }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to save brief");
+  return data;
+}
+
+export async function listBriefs() {
+  const res = await fetch(`${API_BASE}/briefs`);
+  if (!res.ok) throw new Error("Failed to list briefs");
+  return res.json();
+}
+
+export async function loadBrief(filename) {
+  const res = await fetch(`${API_BASE}/briefs/${encodeURIComponent(filename)}`);
+  if (!res.ok) throw new Error("Failed to load brief");
+  return res.json();
+}
+
+export async function deleteBrief(filename) {
+  const res = await fetch(`${API_BASE}/briefs/${encodeURIComponent(filename)}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm: true }),
+  });
+  if (!res.ok) throw new Error("Failed to delete brief");
+  return res.json();
 }
 
 export async function shutdownServer() {

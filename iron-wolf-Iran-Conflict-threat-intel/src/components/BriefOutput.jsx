@@ -1,22 +1,35 @@
 import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import {
-  FileText, Shield, Target, Crosshair, Network, AlertTriangle, CheckSquare,
+  FileText, Shield, Flame, ShoppingCart, TrendingUp, Wifi, CheckSquare, Globe,
+  LayoutGrid, BookOpen, AlertOctagon,
   ChevronDown, ChevronRight
 } from "lucide-react";
 import { useState } from "react";
+import SectorGrid from "./SectorGrid.jsx";
 
 // ---------------------------------------------------------------------------
-// Section metadata
+// Section metadata — mapped to the 8-section executive brief format
 // ---------------------------------------------------------------------------
 const SECTION_META = {
   "executive summary": { icon: FileText, color: "border-l-red-500", css: "section-executive", accent: "text-red-400" },
-  "ioc analysis": { icon: Target, color: "border-l-orange-500", css: "section-ioc", accent: "text-orange-400" },
-  "threat actor attribution": { icon: Crosshair, color: "border-l-purple-500", css: "section-attribution", accent: "text-purple-400" },
-  "ttps": { icon: Shield, color: "border-l-blue-500", css: "section-ttps", accent: "text-blue-400" },
-  "campaign": { icon: Network, color: "border-l-cyan-500", css: "section-campaign", accent: "text-cyan-400" },
-  "risk assessment": { icon: AlertTriangle, color: "border-l-yellow-500", css: "section-risk", accent: "text-yellow-400" },
-  "recommended actions": { icon: CheckSquare, color: "border-l-green-500", css: "section-actions", accent: "text-green-400" },
+  "situation update": { icon: Globe, color: "border-l-orange-500", css: "section-situation", accent: "text-orange-400" },
+  "sector impact": { icon: LayoutGrid, color: "border-l-amber-500", css: "section-sectors", accent: "text-amber-400", isGrid: true },
+  "energy deep": { icon: Flame, color: "border-l-amber-500", css: "section-energy", accent: "text-amber-400" },
+  "energy": { icon: Flame, color: "border-l-amber-500", css: "section-energy", accent: "text-amber-400" },
+  "gas": { icon: Flame, color: "border-l-amber-500", css: "section-energy", accent: "text-amber-400" },
+  "retail": { icon: ShoppingCart, color: "border-l-purple-500", css: "section-retail", accent: "text-purple-400" },
+  "consumer": { icon: ShoppingCart, color: "border-l-purple-500", css: "section-retail", accent: "text-purple-400" },
+  "economic": { icon: TrendingUp, color: "border-l-blue-500", css: "section-economic", accent: "text-blue-400" },
+  "market": { icon: TrendingUp, color: "border-l-blue-500", css: "section-economic", accent: "text-blue-400" },
+  "cyber": { icon: Wifi, color: "border-l-cyan-500", css: "section-cyber", accent: "text-cyan-400" },
+  "domestic": { icon: AlertOctagon, color: "border-l-red-600", css: "section-domestic", accent: "text-red-400" },
+  "extremism": { icon: AlertOctagon, color: "border-l-red-600", css: "section-domestic", accent: "text-red-400" },
+  "terror": { icon: AlertOctagon, color: "border-l-red-600", css: "section-domestic", accent: "text-red-400" },
+  "recommended": { icon: CheckSquare, color: "border-l-green-500", css: "section-actions", accent: "text-green-400" },
+  "actions": { icon: CheckSquare, color: "border-l-green-500", css: "section-actions", accent: "text-green-400" },
+  "sources": { icon: BookOpen, color: "border-l-zinc-500", css: "section-sources", accent: "text-zinc-400" },
+  "confidence": { icon: BookOpen, color: "border-l-zinc-500", css: "section-sources", accent: "text-zinc-400" },
 };
 
 function getSectionMeta(title) {
@@ -27,8 +40,17 @@ function getSectionMeta(title) {
   return { icon: FileText, color: "border-l-zinc-500", css: "", accent: "text-zinc-400" };
 }
 
+function isSectorSection(title, content) {
+  const lower = title.toLowerCase();
+  // Match by title
+  if (lower.includes("sector")) return true;
+  // Fallback: detect sector grid content pattern (### heading + **Impact Level**)
+  if (content && /^### .+\n.*\*\*Impact Level/m.test(content)) return true;
+  return false;
+}
+
 // ---------------------------------------------------------------------------
-// Safe link renderer
+// Safe link renderer — renders source links with visual treatment
 // ---------------------------------------------------------------------------
 function SafeLink({ href, children }) {
   const isAbsoluteSafe = href && (href.startsWith("http://") || href.startsWith("https://"));
@@ -40,7 +62,12 @@ function SafeLink({ href, children }) {
     return <span className="text-zinc-400">{children}</span>;
   }
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 underline underline-offset-2">
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-amber-400 hover:text-amber-300 underline underline-offset-2 decoration-amber-400/40 hover:decoration-amber-300/60 transition-colors"
+    >
       {children}
     </a>
   );
@@ -54,14 +81,14 @@ const mdComponents = {
   img: ({ alt }) => <span className="text-zinc-400">[Image: {alt || "removed"}]</span>,
   h3: ({ children }) => <h3 className="text-base font-semibold text-zinc-100 mt-4 mb-2">{children}</h3>,
   h4: ({ children }) => <h4 className="text-sm font-semibold text-zinc-200 mt-3 mb-1">{children}</h4>,
-  p: ({ children }) => <p className="text-sm text-zinc-300 mb-2 leading-relaxed">{children}</p>,
-  ul: ({ children }) => <ul className="list-disc list-inside text-sm text-zinc-300 mb-2 space-y-1">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal list-inside text-sm text-zinc-300 mb-2 space-y-1">{children}</ol>,
-  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-  strong: ({ children }) => <strong className="text-zinc-100 font-semibold">{children}</strong>,
+  p: ({ children }) => <p className="text-sm text-white mb-2 leading-relaxed">{children}</p>,
+  ul: ({ children }) => <ul className="list-disc list-outside pl-5 text-sm text-white mb-2 space-y-1.5">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal list-outside pl-5 text-sm text-white mb-2 space-y-1.5">{children}</ol>,
+  li: ({ children }) => <li className="leading-relaxed pl-1">{children}</li>,
+  strong: ({ children }) => <strong className="text-white font-semibold">{children}</strong>,
   code: ({ children, className }) => {
     if (className) {
-      return <pre className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-xs text-zinc-300 overflow-x-auto my-2"><code>{children}</code></pre>;
+      return <pre className="bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-xs text-white overflow-x-auto my-2"><code>{children}</code></pre>;
     }
     return <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-amber-400 text-xs">{children}</code>;
   },
@@ -72,8 +99,8 @@ const mdComponents = {
     </div>
   ),
   th: ({ children }) => <th className="border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-left text-zinc-200 font-medium">{children}</th>,
-  td: ({ children }) => <td className="border border-zinc-700 px-3 py-1.5 text-zinc-300">{children}</td>,
-  blockquote: ({ children }) => <blockquote className="border-l-2 border-amber-500 pl-3 my-2 text-zinc-400 italic">{children}</blockquote>,
+  td: ({ children }) => <td className="border border-zinc-700 px-3 py-1.5 text-white">{children}</td>,
+  blockquote: ({ children }) => <blockquote className="border-l-2 border-amber-500 pl-3 my-2 text-white/80 italic">{children}</blockquote>,
 };
 
 // ---------------------------------------------------------------------------
@@ -124,14 +151,14 @@ function TableOfContents({ sections }) {
 // ---------------------------------------------------------------------------
 function DocumentHeader({ isComplete }) {
   return (
-    <div className="doc-header mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-amber-900/40 to-zinc-900 border border-amber-600/20 p-6">
+    <div className="doc-header mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-red-900/40 to-zinc-900 border border-red-600/20 p-6">
       <div className="flex items-center gap-3 mb-2">
-        <Shield className="w-8 h-8 text-amber-400" />
+        <Shield className="w-8 h-8 text-red-400" />
         <div>
-          <h1 className="text-xl font-bold text-zinc-100">Threat Intelligence Brief</h1>
+          <h1 className="text-xl font-bold text-zinc-100">Iran Conflict Executive Intelligence Brief</h1>
           <p className="text-sm text-zinc-400">
-            Iron Wolf Security | Generated {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-            {!isComplete && <span className="ml-2 text-amber-400 animate-pulse">Generating...</span>}
+            Iron Wolf Security | Generated {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+            {!isComplete && <span className="ml-2 text-red-400 animate-pulse">Generating...</span>}
           </p>
         </div>
       </div>
@@ -146,10 +173,12 @@ function DocumentHeader({ isComplete }) {
 // Main BriefOutput component
 // ---------------------------------------------------------------------------
 export default function BriefOutput({ markdown, isStreaming, isComplete }) {
-  // Parse markdown into sections by ## headers
   const sections = useMemo(() => {
     if (!markdown) return [];
-    const parts = markdown.split(/^## /m).filter(Boolean);
+    // Strip any preamble text before the first ## heading
+    const firstH2 = markdown.indexOf("## ");
+    const cleaned = firstH2 > 0 ? markdown.slice(firstH2) : markdown;
+    const parts = cleaned.split(/^## /m).filter(Boolean);
     return parts.map((part) => {
       const newlineIdx = part.indexOf("\n");
       const title = newlineIdx > -1 ? part.slice(0, newlineIdx).trim() : part.trim();
@@ -168,6 +197,8 @@ export default function BriefOutput({ markdown, isStreaming, isComplete }) {
       {sections.map((section, i) => {
         const meta = getSectionMeta(section.title);
         const Icon = meta.icon;
+        const isSector = isSectorSection(section.title, section.content);
+
         return (
           <div
             key={i}
@@ -178,19 +209,26 @@ export default function BriefOutput({ markdown, isStreaming, isComplete }) {
               <Icon className="w-5 h-5" />
               {section.title.slice(0, 100)}
             </h2>
-            <div className="prose-sm">
-              <ReactMarkdown components={mdComponents} skipHtml>
-                {section.content}
-              </ReactMarkdown>
-            </div>
+
+            {isSector ? (
+              /* Render sector impact as visual grid */
+              <SectorGrid content={section.content} isStreaming={isStreaming} />
+            ) : (
+              /* Render normal markdown */
+              <div className="prose-sm">
+                <ReactMarkdown components={mdComponents} skipHtml>
+                  {section.content}
+                </ReactMarkdown>
+              </div>
+            )}
           </div>
         );
       })}
 
       {/* Streaming cursor */}
       {isStreaming && (
-        <div className="flex items-center gap-2 text-sm text-amber-400 animate-pulse px-2">
-          <div className="w-2 h-4 bg-amber-400 rounded-sm animate-pulse" />
+        <div className="flex items-center gap-2 text-sm text-red-400 animate-pulse px-2">
+          <div className="w-2 h-4 bg-red-400 rounded-sm animate-pulse" />
           Generating brief...
         </div>
       )}
