@@ -471,34 +471,73 @@ app.post("/api/shutdown", shutdownLimiter, (req, res) => {
   shuttingDown = true;
   res.json({ status: "shutting down" });
   setTimeout(() => {
-    // Kill parent process tree (concurrently + Vite + this server)
-    // Use execFile (no shell) with validated PID to prevent command injection
-    const ppid = String(process.ppid);
-    if (/^\d+$/.test(ppid) && Number(ppid) > 0 && Number(ppid) <= 65535) {
-      try {
-        execFile("taskkill", ["/F", "/T", "/PID", ppid], { windowsHide: true }, () => {});
-      } catch { /* ppid may not be valid in all launch modes */ }
-    }
-    // Also kill by port in case ppid approach didn't cover Vite
-    // Use execFile (no shell) to safely query netstat and kill processes
-    for (const port of [5176, 3004]) {
-      execFile("netstat", ["-ano"], { windowsHide: true }, (err, stdout) => {
-        if (err || !stdout) return;
-        const portStr = `:${port}`;
-        const pids = [...new Set(
-          stdout.split(/\r?\n/)
-            .filter(line => line.includes(portStr) && line.includes("LISTENING"))
-            .map(line => line.trim().split(/\s+/).pop())
-            .filter(p => /^\d+$/.test(p) && Number(p) > 0 && Number(p) <= 65535)
-        )];
-        for (const pid of pids) {
-          execFile("taskkill", ["/F", "/T", "/PID", pid], { windowsHide: true }, () => {});
+    // Walk up the process tree to find the root cmd.exe / console host PID.
+    // Use WMIC to get parent PIDs so we can kill the entire tree including
+    // the cmd window that launched the app.
+    const safePid = (pid) => /^\d+$/.test(String(pid)) && Number(pid) > 0 && Number(pid) <= 65535;
+    const killPid = (pid) => {
+      if (safePid(pid)) {
+        execFile("taskkill", ["/F", "/T", "/PID", String(pid)], { windowsHide: true }, () => {});
+      }
+    };
+
+    // Find the root ancestor PID (the cmd.exe window) by walking ppid chain
+    const findRootPid = (startPid, callback) => {
+      let current = String(startPid);
+      const visited = new Set();
+      const walk = () => {
+        if (!safePid(current) || visited.has(current)) {
+          callback(current);
+          return;
         }
-      });
-    }
-    // Graceful close + forced exit
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(0), 2000);
+        visited.add(current);
+        execFile("wmic", ["process", "where", `ProcessId=${current}`, "get", "ParentProcessId", "/format:value"],
+          { windowsHide: true }, (err, stdout) => {
+            if (err || !stdout) { callback(current); return; }
+            const match = stdout.match(/ParentProcessId=(\d+)/);
+            if (!match || match[1] === "0" || match[1] === current) {
+              callback(current);
+              return;
+            }
+            // Check if parent is cmd.exe — if so, that's our target
+            execFile("wmic", ["process", "where", `ProcessId=${match[1]}`, "get", "Name", "/format:value"],
+              { windowsHide: true }, (err2, stdout2) => {
+                if (!err2 && stdout2 && /Name=cmd\.exe/i.test(stdout2)) {
+                  callback(match[1]);
+                  return;
+                }
+                current = match[1];
+                walk();
+              });
+          });
+      };
+      walk();
+    };
+
+    // Strategy: find the root cmd.exe ancestor and kill its entire tree,
+    // which takes out the cmd window, npm, concurrently, Vite, and this server
+    findRootPid(process.pid, (rootPid) => {
+      killPid(rootPid);
+
+      // Fallback: also kill by port in case the tree-kill missed anything
+      for (const port of [5176, 3004]) {
+        execFile("netstat", ["-ano"], { windowsHide: true }, (err, stdout) => {
+          if (err || !stdout) return;
+          const portStr = `:${port}`;
+          const pids = [...new Set(
+            stdout.split(/\r?\n/)
+              .filter(line => line.includes(portStr) && line.includes("LISTENING"))
+              .map(line => line.trim().split(/\s+/).pop())
+              .filter(p => safePid(p))
+          )];
+          for (const pid of pids) { killPid(pid); }
+        });
+      }
+
+      // Graceful close + forced exit
+      server.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 2000);
+    });
   }, 300);
 });
 
