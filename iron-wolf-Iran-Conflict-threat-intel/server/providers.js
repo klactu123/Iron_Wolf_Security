@@ -72,37 +72,53 @@ export async function stream(userMessage, systemPrompt, res) {
       messageStream.on("contentBlockStart", (event) => {
         if (event.content_block?.type === "server_tool_use") {
           searchCount++;
-          try {
-            res.write(`data: ${JSON.stringify({ type: "status", text: `Researching intelligence sources... (search ${searchCount})` })}\n\n`);
-          } catch {}
+          if (!res.writableEnded) {
+            try {
+              res.write(`data: ${JSON.stringify({ type: "status", text: `Researching intelligence sources... (search ${searchCount})` })}\n\n`);
+            } catch (writeErr) {
+              console.error("SSE write error (status):", writeErr.message);
+              messageStream.abort();
+            }
+          }
         }
       });
 
       messageStream.on("text", (text) => {
         totalBytes += Buffer.byteLength(text, "utf8");
         if (totalBytes > MAX_STREAM_BYTES) {
-          try {
-            res.write(`data: ${JSON.stringify({ type: "error", error: "Response exceeded maximum size." })}\n\n`);
-          } catch {}
+          if (!res.writableEnded) {
+            try {
+              res.write(`data: ${JSON.stringify({ type: "error", error: "Response exceeded maximum size." })}\n\n`);
+            } catch (writeErr) {
+              console.error("SSE write error (size limit):", writeErr.message);
+            }
+          }
           messageStream.abort();
           return;
         }
-        try {
-          res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
-        } catch {}
+        if (!res.writableEnded) {
+          try {
+            res.write(`data: ${JSON.stringify({ type: "text", text })}\n\n`);
+          } catch (writeErr) {
+            console.error("SSE write error (text):", writeErr.message);
+            messageStream.abort();
+          }
+        }
       });
 
       const finalMessage = await messageStream.finalMessage();
 
-      res.write(
-        `data: ${JSON.stringify({
-          type: "done",
-          usage: {
-            input_tokens: finalMessage.usage?.input_tokens || 0,
-            output_tokens: finalMessage.usage?.output_tokens || 0,
-          },
-        })}\n\n`
-      );
+      if (!res.writableEnded) {
+        res.write(
+          `data: ${JSON.stringify({
+            type: "done",
+            usage: {
+              input_tokens: finalMessage.usage?.input_tokens || 0,
+              output_tokens: finalMessage.usage?.output_tokens || 0,
+            },
+          })}\n\n`
+        );
+      }
 
       return; // Success — exit retry loop
     } catch (error) {
@@ -110,9 +126,13 @@ export async function stream(userMessage, systemPrompt, res) {
         const delay = getRetryDelay(error, attempt);
         const waitSec = Math.round(delay / 1000);
         console.log(`Rate limited (attempt ${attempt + 1}/${MAX_RETRIES}). Retrying in ${waitSec}s...`);
-        try {
-          res.write(`data: ${JSON.stringify({ type: "status", text: `Rate limited — retrying in ${waitSec}s (attempt ${attempt + 1}/${MAX_RETRIES})...` })}\n\n`);
-        } catch {}
+        if (!res.writableEnded) {
+          try {
+            res.write(`data: ${JSON.stringify({ type: "status", text: `Rate limited — retrying in ${waitSec}s (attempt ${attempt + 1}/${MAX_RETRIES})...` })}\n\n`);
+          } catch (writeErr) {
+            console.error("SSE write error (retry status):", writeErr.message);
+          }
+        }
         await sleep(delay);
         continue;
       }

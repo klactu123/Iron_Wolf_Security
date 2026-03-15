@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
+import rehypeSanitize from "rehype-sanitize";
 import {
   FileText, Shield, Flame, ShoppingCart, TrendingUp, Wifi, CheckSquare, Globe,
   LayoutGrid, BookOpen, AlertOctagon,
@@ -216,7 +217,7 @@ export default function BriefOutput({ markdown, isStreaming, isComplete }) {
             ) : (
               /* Render normal markdown */
               <div className="prose-sm">
-                <ReactMarkdown components={mdComponents} skipHtml>
+                <ReactMarkdown components={mdComponents} skipHtml rehypePlugins={[rehypeSanitize]}>
                   {section.content}
                 </ReactMarkdown>
               </div>

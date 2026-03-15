@@ -26,6 +26,8 @@ Generate a comprehensive, actionable executive intelligence brief on the current
 ## RESEARCH METHODOLOGY
 You MUST use web search to research ALL of the following areas before writing your brief:
 - Current military operations and conflict status (search for "Iran conflict latest news today")
+- U.S. and coalition military force deployments and posture changes (search for "US military deployment Middle East 2026", "fighter jets deployed Israel Iran", "US Navy carrier group Persian Gulf", "US force posture Iran conflict")
+- China, Russia, NATO, and North Korea military posture and involvement (search for "China Iran conflict response military", "Russia Iran military support 2026", "NATO response Iran conflict", "North Korea Iran weapons transfer", "North Korea Middle East 2026")
 - Oil and energy market impacts (search for "oil prices Iran conflict", "Strait of Hormuz shipping")
 - U.S. gas prices and energy supply chain (search for "gas prices Iran war impact")
 - Retail and consumer impact (search for "retail supply chain Iran conflict", "consumer prices Middle East")
@@ -39,7 +41,7 @@ You MUST use web search to research ALL of the following areas before writing yo
 - Domestic terrorism and hate crimes linked to the conflict (search for "domestic terrorism Iran war 2026", "synagogue attack 2026", "hate crime Middle East conflict", "university attack 2026", "FBI domestic threat advisory")
 - Lone wolf attacks and extremist activity on U.S. soil (search for "domestic extremism Iran conflict", "antisemitic attack 2026", "Islamophobic attack 2026")
 
-Search at least 10-12 times to ensure comprehensive, current coverage. Cite specific sources by name (Reuters, AP, Bloomberg, CISA, FBI, DOJ, etc.).
+Search at least 14-16 times to ensure comprehensive, current coverage. Cite specific sources by name (Reuters, AP, Bloomberg, CISA, FBI, DOJ, etc.).
 
 ## OUTPUT FORMAT
 Structure your brief with these 9 sections using markdown headers (## Section Name). Every section must contain SPECIFIC, CURRENT data points — not generic analysis.
@@ -53,8 +55,10 @@ Structure your brief with these 9 sections using markdown headers (## Section Na
 
 ## 2. Situation Update
 - Current status of military operations (be specific: dates, locations, actions)
+- U.S. and coalition force deployments and posture changes (aircraft deployments, carrier strike group movements, troop repositioning, air defense system placements — these are critical escalation indicators)
 - Key developments in the last 48-72 hours
 - Diplomatic posture of key parties (U.S., Iran, Israel, Gulf states, China, Russia)
+- Foreign power military involvement: China (naval deployments, military aid, intelligence sharing), Russia (weapons transfers, advisors, naval presence), NATO (alliance posture, member deployments, Article 5 implications), North Korea (weapons transfers, missile technology, troop or materiel support to Iran)
 - Escalation or de-escalation indicators
 - Specific casualty figures, territorial changes, or strikes if available
 - EVERY factual claim must link to its source: e.g., "U.S. forces struck targets in... ([AP](https://...))"
