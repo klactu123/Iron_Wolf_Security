@@ -3,11 +3,11 @@ const API_BASE = "/api";
 // ---------------------------------------------------------------------------
 // SSE streaming for executive intel brief generation
 // ---------------------------------------------------------------------------
-export async function analyzeStream(focus, context, onText, onStatus, onDone, onError, signal) {
+export async function analyzeStream(focus, context, timeframe, onText, onStatus, onDone, onError, signal) {
   const res = await fetch(`${API_BASE}/analyze/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ focus, context }),
+    body: JSON.stringify({ focus, context, timeframe }),
     signal,
   });
 

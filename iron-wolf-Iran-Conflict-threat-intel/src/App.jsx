@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Shield, Power, AlertTriangle, CheckCircle, Loader2, Radio, ChevronDown, ChevronUp, Building2, FileDown, Clock, ArrowLeft } from "lucide-react";
+import { Shield, Power, AlertTriangle, CheckCircle, Loader2, Radio, ChevronDown, ChevronUp, Building2, FileDown, Clock, ArrowLeft, Calendar } from "lucide-react";
 import BriefOutput from "./components/BriefOutput.jsx";
 import SettingsModal from "./components/SettingsModal.jsx";
 import ArchiveSidebar from "./components/ArchiveSidebar.jsx";
@@ -40,9 +40,9 @@ export default function App() {
     }
   }, [state, markdown, focus, context, viewingArchive]);
 
-  function handleGenerate() {
+  function handleGenerate(timeframe = null) {
     setViewingArchive(null);
-    analyze(focus.trim() || null, context.trim() || null);
+    analyze(focus.trim() || null, context.trim() || null, timeframe);
   }
 
   async function handlePdf() {
@@ -206,13 +206,32 @@ export default function App() {
                 </div>
 
                 <button
-                  onClick={handleGenerate}
+                  onClick={() => handleGenerate()}
                   disabled={isStreaming}
                   className="inline-flex items-center gap-3 px-8 py-4 bg-red-700 hover:bg-red-600 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-xl font-bold text-lg transition-colors shadow-lg shadow-red-900/30"
                 >
                   <Radio size={22} />
-                  Generate Intelligence Brief
+                  Generate Full Brief
                 </button>
+
+                {/* Quick timeframe buttons */}
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <span className="text-xs text-zinc-500 mr-1"><Calendar size={12} className="inline mb-0.5" /> Quick update:</span>
+                  {[
+                    { key: "today", label: "Today" },
+                    { key: "yesterday", label: "Yesterday" },
+                    { key: "3days", label: "Last 3 Days" },
+                  ].map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => handleGenerate(key)}
+                      disabled={isStreaming}
+                      className="px-4 py-2 text-sm bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-300 rounded-lg transition-colors border border-zinc-700 hover:border-zinc-600"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}

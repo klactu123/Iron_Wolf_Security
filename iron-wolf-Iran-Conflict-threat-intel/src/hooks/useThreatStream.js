@@ -12,7 +12,7 @@ export function useThreatStream() {
   const [error, setError] = useState(null);
   const abortRef = useRef(null);
 
-  const analyze = useCallback(async (focus, context) => {
+  const analyze = useCallback(async (focus, context, timeframe) => {
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -26,6 +26,7 @@ export function useThreatStream() {
       await analyzeStream(
         focus,
         context,
+        timeframe,
         // onText
         (text) => {
           if (controller.signal.aborted) return;

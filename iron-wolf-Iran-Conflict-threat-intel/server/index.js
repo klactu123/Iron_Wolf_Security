@@ -187,7 +187,7 @@ const STREAM_TIMEOUT_MS = 420_000; // 7 minutes — Claude needs time for 8-10 w
 app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
   // No complex input validation needed — this is a one-button brief generator
   // Optional: user can pass a focus area or custom context
-  const { focus, context } = req.body || {};
+  const { focus, context, timeframe } = req.body || {};
 
   // Enforce per-IP concurrent stream limit
   const clientIp = req.socket?.remoteAddress || "unknown";
@@ -210,6 +210,10 @@ app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
   if (context && (typeof context !== "string" || context.length > 2000)) {
     return res.status(400).json({ error: "Context field exceeds maximum size." });
   }
+  const VALID_TIMEFRAMES = ["today", "yesterday", "3days"];
+  if (timeframe && !VALID_TIMEFRAMES.includes(timeframe)) {
+    return res.status(400).json({ error: "Invalid timeframe value." });
+  }
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -227,7 +231,22 @@ app.post("/api/analyze/stream", analyzeLimiter, async (req, res) => {
   try {
     const systemPrompt = getSystemPrompt();
 
-    let userMessage = "Generate a comprehensive executive intelligence brief on the current Iran conflict situation. Research all aspects thoroughly using web search — military status, energy/gas prices, retail impact, economic/market impact, cyber threats, and recommended actions for leadership.";
+    let userMessage;
+    if (timeframe === "today") {
+      const todayStr = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      userMessage = `Generate an executive intelligence brief focused ONLY on what happened TODAY (${todayStr}) regarding the Iran conflict. Search for "Iran conflict today", "Iran news today", "oil prices today", "cyber attack today". Do NOT summarize the full history of the conflict — only report developments, events, strikes, market moves, and incidents from today. If nothing significant happened today in a particular section, say "No significant developments reported today" for that section. Keep the same 9-section format but scope every section to today's events only.`;
+    } else if (timeframe === "yesterday") {
+      const yesterday = new Date(Date.now() - 86400000);
+      const yesterdayStr = yesterday.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      userMessage = `Generate an executive intelligence brief focused ONLY on what happened YESTERDAY (${yesterdayStr}) regarding the Iran conflict. Search for "Iran conflict ${yesterdayStr}", "Iran news yesterday", "oil prices yesterday". Do NOT summarize the full history of the conflict — only report developments, events, strikes, market moves, and incidents from yesterday. If nothing significant happened yesterday in a particular section, say "No significant developments reported yesterday" for that section. Keep the same 9-section format but scope every section to yesterday's events only.`;
+    } else if (timeframe === "3days") {
+      const threeDaysAgo = new Date(Date.now() - 3 * 86400000);
+      const fromStr = threeDaysAgo.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const todayStr = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      userMessage = `Generate an executive intelligence brief focused ONLY on the LAST 3 DAYS (${fromStr} through ${todayStr}) regarding the Iran conflict. Search for "Iran conflict this week", "Iran news last 3 days", "oil prices this week". Do NOT summarize the full history of the conflict — only report developments, events, strikes, market moves, and incidents from the past 72 hours. If nothing significant happened in the last 3 days for a particular section, say "No significant developments in the past 72 hours" for that section. Keep the same 9-section format but scope every section to the last 3 days only.`;
+    } else {
+      userMessage = "Generate a comprehensive executive intelligence brief on the current Iran conflict situation. Research all aspects thoroughly using web search — military status, energy/gas prices, retail impact, economic/market impact, cyber threats, and recommended actions for leadership.";
+    }
 
     if (focus && focus.trim()) {
       const safeFocus = sanitizePromptInput(focus, 500);
