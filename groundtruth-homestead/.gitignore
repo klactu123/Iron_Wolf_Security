@@ -1,0 +1,34 @@
+node_modules
+.next
+out
+dist
+coverage
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# local data store (JSON file persistence)
+data/
+!data/.gitkeep
+
+# env
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+
+# editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# scan output
+snyk-*.json
+snyk_*.json
+
+# Claude Code session-local config
+.claude/
