@@ -1,0 +1,24 @@
+# --- Secrets: never commit the API key ---
+.env
+
+# --- Runtime / transient ---
+.server.pid
+__pycache__/
+*.pyc
+
+# --- Backups (the backup tool writes these; default location is the parent folder) ---
+*_backup_*.zip
+/backups/
+
+# --- Student data (personal). Keep students/README.md; ignore per-student folders. ---
+students/*/
+
+# --- Claude Code local settings ---
+.claude/settings.local.json
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/

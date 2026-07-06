@@ -1,0 +1,315 @@
+:root {
+  --bg: #e4ebf5;          /* soft tinted canvas behind the white panels */
+  --panel: #ffffff;
+  --panel-2: #eef3fb;     /* one shared light-blue surface (code, output, exercise) */
+  --border: #d8e2f0;
+  --text: #14263f;
+  --muted: #5d6f88;
+  --accent: #2563eb;
+  --accent-2: #1d4ed8;
+  --good: #15a34a;
+  --bad: #dc2626;
+  --warn: #b45309;
+  --code-bg: #eef3fb;
+  --cur-tier: #2563eb;    /* set per lesson to the current difficulty-tier colour */
+  --shadow: 0 8px 24px rgba(20, 50, 100, .14);
+  --shadow-sm: 0 1px 3px rgba(20, 50, 100, .07);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text);
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  transition: background .15s, border-color .15s, box-shadow .15s;
+}
+button:hover { background: var(--panel-2); border-color: #b9d0ee; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #ffffff; font-weight: 600; }
+button.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
+button.success { background: var(--good); border-color: var(--good); color: #ffffff; font-weight: 600; }
+button.success:hover { background: #12833d; }
+button.danger { background: var(--bad); border-color: var(--bad); color: #ffffff; font-weight: 600; }
+button.danger:hover { background: #b91c1c; }
+
+/* ---------- layout ---------- */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(20, 50, 100, .05);
+  flex: 0 0 auto;
+  z-index: 5;
+}
+header .logo { font-weight: 700; font-size: 16px; letter-spacing: .3px; color: var(--text); }
+header .logo .py { color: var(--accent); }
+header .greeting { font-size: 13px; font-weight: 600; color: var(--accent-2); white-space: nowrap; }
+header .greeting:empty { display: none; }
+header .spacer { flex: 1; }
+header .status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); }
+.dot.ready { background: var(--good); }
+.dot.err { background: var(--bad); }
+
+/* student bar */
+.student-bar { display: flex; align-items: center; gap: 6px; margin-right: 6px; }
+.student-bar .who-icon { font-size: 14px; }
+.student-bar select {
+  background: #ffffff; color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 8px; font-size: 12.5px; max-width: 150px;
+}
+.student-bar button { padding: 6px 9px; font-size: 12px; }
+.student-bar input#new-student-input {
+  background: #fff; color: var(--text); border: 1px solid var(--accent);
+  border-radius: 6px; padding: 5px 8px; font-size: 12.5px; width: 170px;
+}
+.student-bar input#new-student-input:focus { outline: none; }
+
+/* course / domain picker at top of the sidebar */
+.course-pick { padding: 12px 16px 6px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--border); }
+.course-pick label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); font-weight: 700; }
+.course-pick select {
+  background: #fff; color: var(--text); border: 1px solid var(--border);
+  border-radius: 7px; padding: 7px 9px; font-size: 13px; font-weight: 600;
+}
+
+/* API-key dropdown */
+.key-wrap { position: relative; }
+.key-dropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 320px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+  z-index: 60;
+}
+.key-dropdown.show { display: block; }
+.key-dropdown label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+.key-dropdown input {
+  width: 100%; padding: 9px 10px; border-radius: 7px;
+  background: #fff; border: 1px solid var(--border); color: var(--text); font-size: 13px;
+}
+.key-dropdown input:focus { outline: none; border-color: var(--accent); }
+.key-dropdown .note { color: var(--muted); font-size: 11.5px; line-height: 1.5; margin-top: 8px; }
+.key-dropdown .row { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+.key-dropdown .key-danger { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.key-dropdown .key-danger button { width: 100%; }
+
+.main {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: var(--sidebar-w, 260px) 7px 1fr 7px var(--tutor-w, 380px);
+  min-height: 0;
+}
+
+/* draggable dividers = the tinted canvas showing between the white panels */
+.splitter {
+  background: var(--bg);
+  cursor: col-resize;
+  transition: background .15s;
+}
+.splitter:hover, .splitter.dragging { background: var(--accent); }
+
+/* ---------- sidebar ---------- */
+.sidebar { background: var(--panel); overflow-y: auto; min-height: 0; padding: 8px 0 40px; }
+.track-head {
+  padding: 10px 16px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* calm pastel difficulty tiers: green -> blue -> lavender */
+.track { margin: 0 0 6px; }
+.track.tier-1 { --tint: #e6f3ea; --hov: #dcefe2; --soft: #f4faf6; --tacc: #3f9468; }  /* Beginner  */
+.track.tier-2 { --tint: #e6eefa; --hov: #dae7f7; --soft: #f4f8fd; --tacc: #4779c4; }  /* Intermediate */
+.track.tier-3 { --tint: #eee7fa; --hov: #e4daf6; --soft: #f7f3fd; --tacc: #7a5fbd; }  /* Expert    */
+
+.track .track-head {
+  color: var(--tacc);
+  background: var(--tint);
+  border-left: 3px solid var(--tacc);
+  padding: 8px 16px 6px;
+}
+.track .lesson-item { background: var(--soft); }
+.track .lesson-item:hover { background: var(--hov); }
+.track .lesson-item.active { background: var(--tint); border-left-color: var(--tacc); }
+.track .lesson-item.done .mark { background: var(--tacc); border-color: var(--tacc); color: #fff; }
+.lesson-item {
+  padding: 8px 16px 8px 26px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid transparent;
+  color: var(--text);
+}
+.lesson-item:hover { background: var(--panel-2); }
+.lesson-item.active { background: #e4eefc; border-left-color: var(--accent); }
+.lesson-item .mark {
+  width: 16px; height: 16px; flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  font-size: 11px; line-height: 14px; text-align: center; color: transparent;
+}
+.lesson-item.done .mark { background: var(--good); border-color: var(--good); color: #fff; }
+.lesson-item .t { flex: 1; }
+.progress-bar { height: 5px; background: var(--panel-2); margin: 4px 16px 8px; border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
+.progress-bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); width: 0; transition: width .3s; }
+
+/* ---------- center ---------- */
+.center { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); }
+.lesson-pane {
+  padding: 15px 20px 16px;
+  overflow-y: auto;
+  flex: 0 0 42%;                            /* fixed height — content scrolls inside, pane never resizes */
+  border-top: 3px solid var(--cur-tier);   /* ties the lesson to its sidebar tier colour */
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.lesson-pane h2 { margin: 0 0 4px; font-size: 20px; }
+.lesson-pane .crumb { color: var(--cur-tier); font-size: 12px; margin-bottom: 10px; font-weight: 700; }
+.lesson-pane p { line-height: 1.6; }
+.lesson-pane pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto; }
+.lesson-pane code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 12.5px; }
+.lesson-pane p code, .lesson-pane li code { background: var(--code-bg); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; color: var(--accent-2); }
+.exercise-box {
+  margin-top: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--cur-tier);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.exercise-box .label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--cur-tier); font-weight: 700; margin-bottom: 4px; }
+.exercise-box .why {
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.exercise-box .why-label {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent-2);
+  margin-bottom: 3px;
+}
+
+.editor-wrap { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.toolbar .spacer { flex: 1; }
+.CodeMirror { height: 100% !important; font-size: 13.5px; background: #ffffff; }
+.editor-scroll { flex: 1 1 auto; min-height: 0; background: #fff; }
+
+.output {
+  flex: 0 0 auto;
+  height: 158px;
+  overflow-y: auto;
+  background: var(--code-bg);
+  border-top: 1px solid var(--border);
+  padding: 10px 14px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: var(--text);
+}
+.output .banner { display: block; padding: 4px 0; font-weight: 700; }
+.output .banner.good { color: var(--good); }
+.output .banner.bad { color: var(--bad); }
+.output .err { color: var(--bad); }
+.output .muted { color: var(--muted); }
+
+/* ---------- tutor ---------- */
+.tutor { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); }
+.tutor-head { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.tutor-head .title { font-weight: 700; }
+.tutor-head .spacer { flex: 1; }
+.tutor-head select { background: #fff; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 12px; }
+.tutor-head button { padding: 5px 9px; font-size: 12px; }
+.chat { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding: 12px 12px 14px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+.msg { max-width: 100%; }
+.msg .who { font-size: 11px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .5px; }
+.msg .bubble { background: #ffffff; border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.msg.user .bubble { background: #e3edfd; border-color: #c6dcfb; }
+.msg .bubble pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px; overflow-x: auto; }
+.msg .bubble code { font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+.msg .bubble p:first-child { margin-top: 0; }
+.msg .bubble p:last-child { margin-bottom: 0; }
+.chat .empty { color: var(--muted); text-align: center; margin-top: 30px; line-height: 1.6; font-size: 13px; }
+
+.composer { border-top: 1px solid var(--border); padding: 10px; display: flex; gap: 8px; align-items: flex-end; background: var(--panel); }
+.composer textarea {
+  flex: 1; resize: none;
+  background: #fff; color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 11px; font-family: inherit; font-size: 13px; line-height: 1.45;
+  min-height: 84px; max-height: 300px;
+}
+.composer textarea:focus { outline: none; border-color: var(--accent); }
+.quick { display: flex; gap: 6px; padding: 0 10px 8px; flex-wrap: wrap; background: var(--panel); }
+.quick button { font-size: 11.5px; padding: 4px 9px; }
+
+a { color: var(--accent); }
+
+/* ---------- welcome / name-entry overlay ---------- */
+.welcome-back {
+  position: fixed; inset: 0; z-index: 80;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+}
+.welcome-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 34px 36px;
+  width: 430px; max-width: 92vw;
+  text-align: center;
+}
+.welcome-logo { font-weight: 700; font-size: 22px; margin-bottom: 12px; letter-spacing: .3px; }
+.welcome-logo .py { color: var(--accent); }
+.welcome-card h2 { margin: 0 0 6px; font-size: 22px; }
+.welcome-card p { color: var(--muted); margin: 0 0 18px; line-height: 1.55; }
+.welcome-card input {
+  width: 100%; padding: 12px 13px; border-radius: 8px;
+  border: 1px solid var(--border); color: var(--text); font-size: 15px; margin-bottom: 14px;
+}
+.welcome-card input:focus { outline: none; border-color: var(--accent); }
+.welcome-card > button { width: 100%; padding: 12px; font-size: 14px; }
+#welcome-resume { margin-top: 18px; }
+#welcome-resume .welcome-resume-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+#welcome-resume .welcome-resume-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+#welcome-resume .welcome-resume-row button { width: auto; padding: 8px 14px; font-size: 13px; }

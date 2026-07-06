@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Python Trainer</title>
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- CodeMirror (editor) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" integrity="sha384-zaeBlB/vwYsDRSlFajnDd7OydJ0cWk+c2OWybl3eSUf6hW2EbhlCsQPqKr3gkznT" crossorigin="anonymous" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js" integrity="sha384-ZYmwuq4n2gOcNxMSiJ6jyTj+BbIrilr7p6dlq6q5nmSWKmsH9UU4K1qqjycMkfmR" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js" integrity="sha384-Xy+2exU6lBoT4OpUOtnQb+cUpn+nlJQEHvRobWVtwz6wIsw4oNoO7xyd/l8rYgMy" crossorigin="anonymous"></script>
+
+  <!-- Markdown rendering for the tutor's replies, sanitized with DOMPurify -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.11/dist/purify.min.js" integrity="sha384-o44XUELLEnv/iSlA1NWxBweqbD4TSR0qgq2VzVsxtkHS989JJjGKSE9vkfo5MN4K" crossorigin="anonymous"></script>
+
+  <!-- Pyodide runs inside the Web Worker (see app.js), loaded via importScripts.
+       importScripts cannot use SRI, so Pyodide is the one CDN dependency not integrity-pinned. -->
+
+  <!-- Curriculum data -->
+  <script src="curriculum.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="logo"><span class="py">Py</span>Trainer</div>
+      <div class="greeting" id="greeting"></div>
+      <div class="status">
+        <span class="dot" id="py-dot"></span>
+        <span id="py-status">Loading Python…</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="student-bar">
+        <span class="who-icon">👤</span>
+        <select id="student-select" title="Active student"></select>
+        <input id="new-student-input" type="text" placeholder="New student name — Enter" style="display:none" autocomplete="off" />
+        <button id="btn-new-student" title="Add a new student">＋</button>
+        <button id="btn-del-student" title="Delete this name and start over">🗑</button>
+        <button id="btn-export" title="Save this student's work to a file">⭳ Export</button>
+        <button id="btn-import" title="Load a student's work from a file">⭱ Import</button>
+        <input type="file" id="import-file" accept="application/json,.json" style="display:none" />
+      </div>
+      <div class="key-wrap" id="key-wrap">
+        <button id="btn-key">🔑 API Key ▾</button>
+        <div class="key-dropdown" id="key-dropdown">
+          <div id="key-entry">
+            <label for="api-key">Anthropic API key</label>
+            <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off" />
+            <div class="note" id="key-note"></div>
+            <div class="row">
+              <button id="btn-clear-key">Erase key</button>
+              <button class="primary" id="btn-apply-key">Apply</button>
+            </div>
+          </div>
+          <div class="key-danger">
+            <button id="btn-del-student-2" title="Delete the current student and start over with a new name (keeps your API key)">Delete this student &amp; start over</button>
+            <button class="danger" id="btn-reset-all" title="Delete all profiles, progress, chat, and the API key">Reset everything</button>
+          </div>
+        </div>
+      </div>
+      <button id="btn-exit" title="Save your work and return to the sign-in screen">Save &amp; exit</button>
+    </header>
+
+    <div class="main">
+      <!-- Sidebar -->
+      <nav class="sidebar" id="sidebar"></nav>
+
+      <!-- Drag handle to resize the lesson list -->
+      <div class="splitter" id="sidebar-splitter" title="Drag to resize · double-click to reset"></div>
+
+      <!-- Center: lesson + editor + output -->
+      <section class="center">
+        <div class="lesson-pane" id="lesson-pane"></div>
+        <div class="editor-wrap">
+          <div class="toolbar">
+            <button class="primary" id="btn-run">▶ Run</button>
+            <button class="success" id="btn-check">✓ Check</button>
+            <button class="danger" id="btn-stop" style="display:none">■ Stop</button>
+            <button id="btn-reset">↺ Reset</button>
+            <div class="spacer"></div>
+            <button id="btn-explain" title="Ask the tutor to explain this lesson">💡 Explain</button>
+          </div>
+          <div class="editor-scroll">
+            <textarea id="editor"></textarea>
+          </div>
+          <div class="output" id="output"><span class="muted">Output will appear here. Press Run.</span></div>
+        </div>
+      </section>
+
+      <!-- Drag handle to resize the tutor panel -->
+      <div class="splitter" id="splitter" title="Drag to resize · double-click to reset"></div>
+
+      <!-- Tutor -->
+      <section class="tutor">
+        <div class="tutor-head">
+          <span class="title">🎓 Claude Tutor</span>
+          <div class="spacer"></div>
+          <button id="btn-clear-chat" title="Clear this conversation (lessons &amp; code are unaffected)">🧹 New chat</button>
+          <select id="model-select" title="Model">
+            <option value="claude-opus-4-8">Opus 4.8 (smartest)</option>
+            <option value="claude-sonnet-4-6">Sonnet 4.6 (balanced)</option>
+            <option value="claude-haiku-4-5">Haiku 4.5 (fastest)</option>
+          </select>
+        </div>
+        <div class="chat" id="chat">
+          <div class="empty">
+            Ask the tutor anything about Python or your current exercise.<br />
+            It can see the lesson and the code in your editor.<br /><br />
+            Add your Anthropic API key in <b>Tutor Settings</b> to begin.
+          </div>
+        </div>
+        <div class="quick" id="quick"></div>
+        <div class="composer">
+          <textarea id="chat-input" rows="3" placeholder="Ask a question…  (Enter to send, Shift+Enter for newline)"></textarea>
+          <button class="primary" id="btn-send">Send</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- First-run welcome: student enters their name to create their folder -->
+  <div class="welcome-back" id="welcome" style="display:none">
+    <div class="welcome-card">
+      <div class="welcome-logo"><span class="py">Py</span>Trainer</div>
+      <h2>Welcome!</h2>
+      <p>Enter your name to begin. A folder will be created in your name to save
+      your projects and progress.</p>
+      <input id="welcome-name" type="text" placeholder="Your name" autocomplete="off" />
+      <button class="primary" id="welcome-start">Start learning →</button>
+      <div id="welcome-resume"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
